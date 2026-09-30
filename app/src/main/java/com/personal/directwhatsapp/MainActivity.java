@@ -6,17 +6,22 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.CallLog;
+import android.telephony.TelephonyManager;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -28,18 +33,28 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import com.google.i18n.phonenumbers.NumberParseException;
+import com.google.i18n.phonenumbers.PhoneNumberUtil;
+import com.google.i18n.phonenumbers.Phonenumber;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class MainActivity extends Activity {
     private static final int CALL_LOG_PERMISSION_REQUEST = 41;
+    private static final String EXTRA_OPEN_RECENT_CALLS = "open_recent_calls";
+    private static final String PREFS_NAME = "direct_preferences";
+    private static final String PREF_SAVE_HISTORY = "save_recent_numbers";
+    private static final String PREF_RECENT_NUMBERS = "recent_numbers";
     private static final int INK = Color.rgb(24, 37, 32);
     private static final int MUTED = Color.rgb(105, 119, 111);
     private static final int GREEN = Color.rgb(23, 132, 88);
@@ -51,22 +66,28 @@ public final class MainActivity extends Activity {
     private Spinner country;
     private TextView error;
     private String pendingChatUrl;
-    private final String[] countries = {"🇵🇰   Pakistan  +92", "🇺🇸   United States  +1", "🇬🇧   United Kingdom  +44", "🇮🇳   India  +91", "🇦🇪   United Arab Emirates  +971", "🇸🇦   Saudi Arabia  +966", "🇦🇺   Australia  +61", "Other / full number"};
-    private final String[] prefixes = {"92", "1", "44", "91", "971", "966", "61", ""};
+    private final PhoneNumberUtil phoneUtil = PhoneNumberUtil.getInstance();
+    private List<CountryOption> countryOptions = new ArrayList<>();
+    private String[] countries;
+    private String[] prefixes;
+    private Switch saveHistorySwitch;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setStatusBarColor(PAGE);
         getWindow().setNavigationBarColor(PAGE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        prepareCountries();
         buildScreen();
         handleIncomingNumber(getIntent());
+        openRecentCallsFromShortcut(getIntent());
     }
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
         handleIncomingNumber(intent);
+        openRecentCallsFromShortcut(intent);
     }
 
     private void buildScreen() {
@@ -140,14 +161,14 @@ public final class MainActivity extends Activity {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, countries);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         country.setAdapter(adapter);
-        country.setSelection(0);
+        country.setSelection(getDetectedCountryIndex());
         country.setPadding(dp(10), 0, dp(10), 0);
         country.setBackground(fieldBackground());
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, dp(54)); cp.topMargin = dp(8); card.addView(country, cp);
 
         phone = input("e.g. 300 1234567", InputType.TYPE_CLASS_PHONE);
         LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, dp(54)); pp.topMargin = dp(10); card.addView(phone, pp);
-        TextView shareHint = text("Call history is read only when you tap Recent calls.", 11, MUTED, false);
+        TextView shareHint = text("Country detected from your network or device region. Change it anytime.", 11, MUTED, false);
         LinearLayout.LayoutParams shareHintParams = new LinearLayout.LayoutParams(-1, -2);
         shareHintParams.topMargin = dp(8);
         card.addView(shareHint, shareHintParams);
@@ -164,6 +185,40 @@ public final class MainActivity extends Activity {
         TextView hint = text("Choose WhatsApp or WhatsApp Business", 11, MUTED, false);
         hint.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams hn = new LinearLayout.LayoutParams(-1, -2); hn.topMargin = dp(10); card.addView(hint, hn);
+
+        LinearLayout historyRow = row();
+        LinearLayout.LayoutParams historyParams = new LinearLayout.LayoutParams(-1, -2);
+        historyParams.topMargin = dp(13);
+        card.addView(historyRow, historyParams);
+        LinearLayout historyCopy = column();
+        historyCopy.addView(text("Save recent numbers", 12, INK, true));
+        TextView historyCaption = text("Only on this phone · off by default", 10, MUTED, false);
+        LinearLayout.LayoutParams historyCaptionParams = new LinearLayout.LayoutParams(-1, -2);
+        historyCaptionParams.topMargin = dp(2);
+        historyCopy.addView(historyCaption, historyCaptionParams);
+        historyRow.addView(historyCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        saveHistorySwitch = new Switch(this);
+        saveHistorySwitch.setChecked(getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_SAVE_HISTORY, false));
+        historyRow.addView(saveHistorySwitch);
+        saveHistorySwitch.setOnCheckedChangeListener((button, enabled) -> {
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean(PREF_SAVE_HISTORY, enabled).apply();
+            if (!enabled) getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().remove(PREF_RECENT_NUMBERS).apply();
+            historyCaption.setText(enabled ? "Stored only here · turn off to clear" : "Only on this phone · off by default");
+        });
+        historyCaption.setText(saveHistorySwitch.isChecked() ? "Stored only here · turn off to clear" : "Only on this phone · off by default");
+        TextView savedNumbers = text("VIEW SAVED NUMBERS  ›", 10, GREEN, true);
+        savedNumbers.setGravity(Gravity.CENTER);
+        savedNumbers.setPadding(dp(10), 0, dp(4), 0);
+        historyRow.addView(savedNumbers, new LinearLayout.LayoutParams(-2, dp(40)));
+        savedNumbers.setOnClickListener(v -> showSavedNumbers());
+
+        TextView addShortcut = text("＋  Add Recent Calls shortcut to Home screen", 12, GREEN, true);
+        addShortcut.setGravity(Gravity.CENTER);
+        addShortcut.setPadding(dp(8), dp(12), dp(8), dp(5));
+        LinearLayout.LayoutParams shortcutParams = new LinearLayout.LayoutParams(-1, -2);
+        shortcutParams.topMargin = dp(5);
+        card.addView(addShortcut, shortcutParams);
+        addShortcut.setOnClickListener(v -> pinRecentCallsShortcut());
 
         LinearLayout stepsTitle = row();
         LinearLayout.LayoutParams stp = new LinearLayout.LayoutParams(-1, -2); stp.topMargin = dp(25); stp.bottomMargin = dp(11); page.addView(stepsTitle, stp);
@@ -184,7 +239,7 @@ public final class MainActivity extends Activity {
         TextView lock = text("✓", 14, GREEN, true); lock.setGravity(Gravity.CENTER);
         lock.setBackground(pill(Color.WHITE, 20));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(26), dp(26)); lp.rightMargin = dp(10); privacy.addView(lock, lp);
-        TextView privacyText = text("No contacts are saved. Call history is read only when you open Recent calls.", 11, MUTED, false);
+        TextView privacyText = text("Numbers are only saved if you turn on local history. Call log is read only when requested.", 11, MUTED, false);
         privacyText.setLineSpacing(dp(2), 1f);
         privacy.addView(privacyText, new LinearLayout.LayoutParams(0, -2, 1));
         setContentView(scroll);
@@ -192,22 +247,35 @@ public final class MainActivity extends Activity {
 
     private void openChat() {
         String raw = phone.getText().toString().trim();
-        String digits = raw.replaceAll("\\D", "");
-        int selected = country.getSelectedItemPosition();
-        if (selected < prefixes.length && !prefixes[selected].isEmpty()) {
-            String prefix = prefixes[selected];
-            String local = digits.replaceFirst("^0+", "");
-            digits = local.startsWith(prefix) ? local : prefix + local;
-        }
-        if (digits.length() < 7 || digits.length() > 15) {
-            error.setText("Enter a valid number with its country code (7–15 digits).");
+        String region = getSelectedRegion();
+        Phonenumber.PhoneNumber parsed;
+        try {
+            parsed = phoneUtil.parse(raw, "ZZ".equals(region) ? null : region);
+        } catch (NumberParseException ex) {
+            error.setText("Enter a valid number and choose its country.");
             phone.requestFocus();
             return;
         }
+        if (!phoneUtil.isPossibleNumber(parsed)) {
+            error.setText("This number does not look complete for the selected country.");
+            phone.requestFocus();
+            return;
+        }
+        String e164 = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164);
+        if (e164.length() < 8 || e164.length() > 16) {
+            error.setText("Enter a valid number with its country code.");
+            phone.requestFocus();
+            return;
+        }
+        String numberRegion = phoneUtil.getRegionCodeForNumber(parsed);
+        selectCountryRegion(numberRegion);
+        phone.setText(phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL));
+        phone.setSelection(phone.length());
         error.setText("");
+        rememberNumber(e164);
         Object service = getSystemService(Context.INPUT_METHOD_SERVICE);
         if (service instanceof InputMethodManager) ((InputMethodManager)service).hideSoftInputFromWindow(phone.getWindowToken(), 0);
-        pendingChatUrl = "https://wa.me/" + digits;
+        pendingChatUrl = "https://wa.me/" + e164.substring(1);
         showAccountPicker();
     }
 
@@ -235,6 +303,147 @@ public final class MainActivity extends Activity {
         CharSequence copied = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
         if (copied == null || !fillPhoneFromSharedText(copied.toString())) {
             Toast.makeText(this, "No phone number found in the copied text.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void prepareCountries() {
+        List<String> regions = new ArrayList<>(phoneUtil.getSupportedRegions());
+        Collections.sort(regions, (first, second) ->
+                new Locale("", first).getDisplayCountry().compareToIgnoreCase(new Locale("", second).getDisplayCountry()));
+        countryOptions.clear();
+        for (String region : regions) {
+            int callingCode = phoneUtil.getCountryCodeForRegion(region);
+            if (callingCode <= 0) continue;
+            String countryName = new Locale("", region).getDisplayCountry();
+            countryOptions.add(new CountryOption(region, String.valueOf(callingCode),
+                    flagFor(region) + "   " + countryName + "  +" + callingCode));
+        }
+        countryOptions.add(new CountryOption("ZZ", "", "Other / full number"));
+        countries = new String[countryOptions.size()];
+        prefixes = new String[countryOptions.size()];
+        for (int i = 0; i < countryOptions.size(); i++) {
+            countries[i] = countryOptions.get(i).label;
+            prefixes[i] = countryOptions.get(i).callingCode;
+        }
+    }
+
+    private String flagFor(String region) {
+        if (region == null || region.length() != 2) return "";
+        int first = Character.toUpperCase(region.charAt(0)) - 'A' + 0x1F1E6;
+        int second = Character.toUpperCase(region.charAt(1)) - 'A' + 0x1F1E6;
+        return new String(new int[]{first, second}, 0, 2);
+    }
+
+    private String detectCountryRegion() {
+        String region = "";
+        try {
+            if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)) {
+                TelephonyManager manager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+                if (manager != null) region = manager.getNetworkCountryIso();
+            }
+        } catch (RuntimeException ignored) { }
+        if (region == null || region.trim().isEmpty()) region = Locale.getDefault().getCountry();
+        region = region == null ? "" : region.toUpperCase(Locale.ROOT);
+        return phoneUtil.getCountryCodeForRegion(region) > 0 ? region : "PK";
+    }
+
+    private int getDetectedCountryIndex() {
+        String detected = detectCountryRegion();
+        for (int i = 0; i < countryOptions.size(); i++) {
+            if (countryOptions.get(i).region.equals(detected)) return i;
+        }
+        return 0;
+    }
+
+    private String getSelectedRegion() {
+        int selected = country == null ? getDetectedCountryIndex() : country.getSelectedItemPosition();
+        return selected >= 0 && selected < countryOptions.size() ? countryOptions.get(selected).region : detectCountryRegion();
+    }
+
+    private void selectCountryRegion(String region) {
+        if (region == null || region.isEmpty() || "ZZ".equals(region)) return;
+        for (int i = 0; i < countryOptions.size(); i++) {
+            if (countryOptions.get(i).region.equalsIgnoreCase(region)) {
+                country.setSelection(i);
+                return;
+            }
+        }
+    }
+
+    private void rememberNumber(String e164) {
+        if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_SAVE_HISTORY, false)) return;
+        List<String> numbers = getSavedNumberList();
+        numbers.remove(e164);
+        numbers.add(0, e164);
+        while (numbers.size() > 30) numbers.remove(numbers.size() - 1);
+        StringBuilder stored = new StringBuilder();
+        for (String number : numbers) {
+            if (stored.length() > 0) stored.append('\n');
+            stored.append(number);
+        }
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putString(PREF_RECENT_NUMBERS, stored.toString()).apply();
+    }
+
+    private List<String> getSavedNumberList() {
+        String saved = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_RECENT_NUMBERS, "");
+        List<String> numbers = new ArrayList<>();
+        if (saved == null || saved.isEmpty()) return numbers;
+        for (String number : saved.split("\\n")) {
+            if (!number.trim().isEmpty()) numbers.add(number.trim());
+        }
+        return numbers;
+    }
+
+    private void showSavedNumbers() {
+        if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_SAVE_HISTORY, false)) {
+            Toast.makeText(this, "Turn on Save recent numbers first.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<RecentCall> items = new ArrayList<>();
+        for (String number : getSavedNumberList()) items.add(new RecentCall(number, "Recent number", "saved on this phone"));
+        showRecentCalls(items);
+    }
+
+    private void pinRecentCallsShortcut() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            Toast.makeText(this, "Home-screen shortcuts need Android 8 or newer.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        ShortcutManager shortcutManager = getSystemService(ShortcutManager.class);
+        if (shortcutManager == null || !shortcutManager.isRequestPinShortcutSupported()) {
+            Toast.makeText(this, "This launcher does not support pinned shortcuts.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        Intent shortcutIntent = new Intent(this, MainActivity.class);
+        shortcutIntent.setAction("com.personal.directwhatsapp.OPEN_RECENT_CALLS");
+        shortcutIntent.putExtra(EXTRA_OPEN_RECENT_CALLS, true);
+        ShortcutInfo shortcut = new ShortcutInfo.Builder(this, "direct-recent-calls")
+                .setShortLabel("Recent calls")
+                .setLongLabel("Choose a number from Recent calls")
+                .setIcon(Icon.createWithResource(this, R.mipmap.ic_launcher))
+                .setIntent(shortcutIntent)
+                .build();
+        try {
+            shortcutManager.requestPinShortcut(shortcut, null);
+        } catch (RuntimeException ex) {
+            Toast.makeText(this, "Could not add the shortcut on this launcher.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void openRecentCallsFromShortcut(Intent intent) {
+        if (intent != null && intent.getBooleanExtra(EXTRA_OPEN_RECENT_CALLS, false) && phone != null) {
+            phone.post(this::openRecentCalls);
+        }
+    }
+
+    private static final class CountryOption {
+        final String region;
+        final String callingCode;
+        final String label;
+        CountryOption(String region, String callingCode, String label) {
+            this.region = region;
+            this.callingCode = callingCode;
+            this.label = label;
         }
     }
 
@@ -293,9 +502,9 @@ public final class MainActivity extends Activity {
         LinearLayout sheet = column();
         sheet.setPadding(dp(22), dp(18), dp(22), dp(18));
         sheet.setBackground(round(Color.WHITE, 24));
-        TextView title = text("Choose a recent number", 21, INK, true);
+        TextView title = text("Choose a number", 21, INK, true);
         sheet.addView(title);
-        TextView subtitle = text("Select a call to fill the phone number.", 12, MUTED, false);
+        TextView subtitle = text("Select a call or saved number to fill the phone field.", 12, MUTED, false);
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
         subtitleParams.topMargin = dp(5);
         subtitleParams.bottomMargin = dp(12);
@@ -324,7 +533,10 @@ public final class MainActivity extends Activity {
                 list.addView(item, itemParams);
                 item.setOnClickListener(v -> {
                     phone.setText(call.number);
-                    if (call.number.startsWith("+")) country.setSelection(prefixes.length - 1);
+                    if (call.number.startsWith("+")) {
+                        try { selectCountryRegion(phoneUtil.getRegionCodeForNumber(phoneUtil.parse(call.number, null))); }
+                        catch (NumberParseException ignored) { country.setSelection(prefixes.length - 1); }
+                    }
                     phone.setSelection(phone.length());
                     error.setText("");
                     dialog.dismiss();
