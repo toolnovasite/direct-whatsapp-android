@@ -102,11 +102,11 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-1, dp(120)); mp.topMargin = dp(8); card.addView(message, mp);
 
         Button open = new Button(this);
-        open.setText("Open WhatsApp  →"); open.setTextColor(Color.WHITE); open.setTextSize(15); open.setTypeface(Typeface.DEFAULT, Typeface.BOLD); open.setAllCaps(false); open.setBackground(round(GREEN, 12));
+        open.setText("Choose WhatsApp account  →"); open.setTextColor(Color.WHITE); open.setTextSize(15); open.setTypeface(Typeface.DEFAULT, Typeface.BOLD); open.setAllCaps(false); open.setBackground(round(GREEN, 12));
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(54)); bp.topMargin = dp(20); card.addView(open, bp);
         open.setOnClickListener(v -> openChat());
 
-        TextView note = text("WhatsApp opens with your message ready. You choose when to send it.", 12, MUTED, false);
+        TextView note = text("Choose WhatsApp, WhatsApp Business, or the Vivo clone if it appears. You send inside WhatsApp.", 12, MUTED, false);
         note.setGravity(Gravity.CENTER); note.setLineSpacing(dp(3), 1f);
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(-1, -2); np.topMargin = dp(12); card.addView(note, np);
 
@@ -127,7 +127,10 @@ public final class MainActivity extends Activity {
         String draft = message.getText().toString().trim();
         String url = "https://wa.me/" + digits;
         if (!draft.isEmpty()) url += "?text=" + Uri.encode(draft);
-        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); }
+        try {
+            Intent chatIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            startActivity(Intent.createChooser(chatIntent, "Choose WhatsApp account"));
+        }
         catch (ActivityNotFoundException ex) { Toast.makeText(this, "No browser or WhatsApp app is available to open this chat.", Toast.LENGTH_LONG).show(); }
     }
 
@@ -139,4 +142,6 @@ public final class MainActivity extends Activity {
     private GradientDrawable round(int color, int radius) { GradientDrawable d = new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(radius)); return d; }
     private int dp(int value) { return (int)(value * getResources().getDisplayMetrics().density + .5f); }
 }
+
+
 
