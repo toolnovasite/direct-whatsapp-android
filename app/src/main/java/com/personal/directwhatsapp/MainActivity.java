@@ -22,7 +22,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.CallLog;
 import android.telephony.TelephonyManager;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
@@ -140,6 +142,15 @@ public final class MainActivity extends Activity {
 
         LinearLayout phoneHeader = row();
         phoneHeader.addView(text("PHONE NUMBER", 11, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView autoCountry = text("AUTO", 10, GREEN, true);
+        autoCountry.setPadding(dp(10), dp(6), dp(10), dp(6));
+        autoCountry.setBackground(pill(Color.rgb(232, 243, 235), 20));
+        phoneHeader.addView(autoCountry);
+        autoCountry.setOnClickListener(v -> {
+            int detected = getDetectedCountryIndex();
+            country.setSelection(detected);
+            Toast.makeText(this, "Country: " + countryOptions.get(detected).label, Toast.LENGTH_SHORT).show();
+        });
         card.addView(phoneHeader);
         LinearLayout numberTools = row();
         LinearLayout.LayoutParams toolsParams = new LinearLayout.LayoutParams(-1, dp(44));
@@ -167,8 +178,20 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, dp(54)); cp.topMargin = dp(8); card.addView(country, cp);
 
         phone = input("e.g. 300 1234567", InputType.TYPE_CLASS_PHONE);
+        phone.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String value = s == null ? "" : s.toString().trim();
+                if (!value.startsWith("+") || value.length() < 3) return;
+                try {
+                    Phonenumber.PhoneNumber parsed = phoneUtil.parse(value, null);
+                    selectCountryRegion(phoneUtil.getRegionCodeForNumber(parsed));
+                } catch (NumberParseException ignored) { }
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        });
         LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, dp(54)); pp.topMargin = dp(10); card.addView(phone, pp);
-        TextView shareHint = text("Country detected from your network or device region. Change it anytime.", 11, MUTED, false);
+        TextView shareHint = text("Country auto-detected from your SIM or device region. Type + to detect from a number.", 11, MUTED, false);
         LinearLayout.LayoutParams shareHintParams = new LinearLayout.LayoutParams(-1, -2);
         shareHintParams.topMargin = dp(8);
         card.addView(shareHint, shareHintParams);
@@ -335,16 +358,30 @@ public final class MainActivity extends Activity {
     }
 
     private String detectCountryRegion() {
-        String region = "";
+        TelephonyManager manager = null;
         try {
-            if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)) {
-                TelephonyManager manager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
-                if (manager != null) region = manager.getNetworkCountryIso();
+            if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION)
+                    || getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)) {
+                manager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
             }
         } catch (RuntimeException ignored) { }
-        if (region == null || region.trim().isEmpty()) region = Locale.getDefault().getCountry();
-        region = region == null ? "" : region.toUpperCase(Locale.ROOT);
-        return phoneUtil.getCountryCodeForRegion(region) > 0 ? region : "PK";
+        if (manager != null) {
+            try {
+                String simRegion = manager.getSimCountryIso();
+                if (isSupportedRegion(simRegion)) return simRegion.toUpperCase(Locale.ROOT);
+            } catch (RuntimeException ignored) { }
+            try {
+                String networkRegion = manager.getNetworkCountryIso();
+                if (isSupportedRegion(networkRegion)) return networkRegion.toUpperCase(Locale.ROOT);
+            } catch (RuntimeException ignored) { }
+        }
+        String deviceRegion = Locale.getDefault().getCountry();
+        if (isSupportedRegion(deviceRegion)) return deviceRegion.toUpperCase(Locale.ROOT);
+        return "PK";
+    }
+
+    private boolean isSupportedRegion(String region) {
+        return region != null && region.length() == 2 && phoneUtil.getCountryCodeForRegion(region.toUpperCase(Locale.ROOT)) > 0;
     }
 
     private int getDetectedCountryIndex() {
