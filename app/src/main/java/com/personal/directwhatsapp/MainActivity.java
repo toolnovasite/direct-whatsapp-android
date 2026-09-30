@@ -3,6 +3,7 @@ package com.personal.directwhatsapp;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.ActivityNotFoundException;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -23,6 +24,8 @@ import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class MainActivity extends Activity {
     private static final int INK = Color.rgb(24, 37, 32);
@@ -45,6 +48,13 @@ public final class MainActivity extends Activity {
         getWindow().setNavigationBarColor(PAGE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         buildScreen();
+        handleIncomingNumber(getIntent());
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIncomingNumber(intent);
     }
 
     private void buildScreen() {
@@ -95,7 +105,14 @@ public final class MainActivity extends Activity {
         TextView cardSub = text("Start a chat without adding a contact.", 12, MUTED, false);
         LinearLayout.LayoutParams csp = new LinearLayout.LayoutParams(-1, -2); csp.topMargin = dp(5); csp.bottomMargin = dp(20); card.addView(cardSub, csp);
 
-        card.addView(label("PHONE NUMBER", "COUNTRY CODE INCLUDED"));
+        LinearLayout phoneHeader = row();
+        phoneHeader.addView(text("PHONE NUMBER", 11, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView paste = text("PASTE", 10, GREEN, true);
+        paste.setPadding(dp(10), dp(6), dp(10), dp(6));
+        paste.setBackground(pill(Color.rgb(232, 243, 235), 20));
+        phoneHeader.addView(paste);
+        paste.setOnClickListener(v -> pasteNumber());
+        card.addView(phoneHeader);
         country = new Spinner(this);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, countries);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -107,6 +124,10 @@ public final class MainActivity extends Activity {
 
         phone = input("e.g. 300 1234567", InputType.TYPE_CLASS_PHONE);
         LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, dp(54)); pp.topMargin = dp(10); card.addView(phone, pp);
+        TextView shareHint = text("Tip: share a number from Recent calls to Direct.", 11, MUTED, false);
+        LinearLayout.LayoutParams shareHintParams = new LinearLayout.LayoutParams(-1, -2);
+        shareHintParams.topMargin = dp(8);
+        card.addView(shareHint, shareHintParams);
         error = text("", 12, Color.rgb(181, 66, 53), false);
         LinearLayout.LayoutParams er = new LinearLayout.LayoutParams(-1, -2); er.topMargin = dp(5); card.addView(error, er);
 
@@ -165,6 +186,50 @@ public final class MainActivity extends Activity {
         if (service instanceof InputMethodManager) ((InputMethodManager)service).hideSoftInputFromWindow(phone.getWindowToken(), 0);
         pendingChatUrl = "https://wa.me/" + digits;
         showAccountPicker();
+    }
+
+    private void handleIncomingNumber(Intent intent) {
+        if (intent == null) return;
+        String value = null;
+        if (Intent.ACTION_VIEW.equals(intent.getAction()) && intent.getData() != null
+                && "tel".equalsIgnoreCase(intent.getData().getScheme())) {
+            value = intent.getData().getSchemeSpecificPart();
+        } else if (Intent.ACTION_SEND.equals(intent.getAction())) {
+            value = intent.getStringExtra(Intent.EXTRA_TEXT);
+        }
+        if (value != null) fillPhoneFromSharedText(value);
+    }
+
+    private void pasteNumber() {
+        Object service = getSystemService(Context.CLIPBOARD_SERVICE);
+        if (!(service instanceof ClipboardManager)) return;
+        ClipboardManager clipboard = (ClipboardManager) service;
+        if (!clipboard.hasPrimaryClip() || clipboard.getPrimaryClip() == null
+                || clipboard.getPrimaryClip().getItemCount() == 0) {
+            Toast.makeText(this, "Copy a phone number first.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        CharSequence copied = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
+        if (copied == null || !fillPhoneFromSharedText(copied.toString())) {
+            Toast.makeText(this, "No phone number found in the copied text.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private boolean fillPhoneFromSharedText(String value) {
+        Matcher matcher = Pattern.compile("(?<!\\d)\\+?\\d[\\d\\s().-]{5,}\\d(?!\\d)").matcher(value);
+        String candidate = null;
+        while (matcher.find()) {
+            String found = matcher.group().trim();
+            int digitCount = found.replaceAll("\\D", "").length();
+            if (digitCount >= 7 && digitCount <= 15) { candidate = found; break; }
+        }
+        if (candidate == null) return false;
+        if (candidate.startsWith("00")) candidate = "+" + candidate.substring(2);
+        phone.setText(candidate);
+        if (candidate.startsWith("+")) country.setSelection(prefixes.length - 1);
+        phone.setSelection(phone.length());
+        phone.requestFocus();
+        return true;
     }
 
     private void showAccountPicker() {
