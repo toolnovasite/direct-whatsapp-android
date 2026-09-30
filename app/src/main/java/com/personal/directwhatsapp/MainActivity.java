@@ -1,6 +1,7 @@
 package com.personal.directwhatsapp;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -32,6 +33,7 @@ public final class MainActivity extends Activity {
     private EditText phone, message;
     private Spinner country;
     private TextView error;
+    private String pendingChatUrl;
     private final String[] countries = {"🇵🇰   Pakistan  +92", "🇺🇸   United States  +1", "🇬🇧   United Kingdom  +44", "🇮🇳   India  +91", "🇦🇪   United Arab Emirates  +971", "🇸🇦   Saudi Arabia  +966", "🇦🇺   Australia  +61", "Other / full number"};
     private final String[] prefixes = {"92", "1", "44", "91", "971", "966", "61", ""};
 
@@ -171,14 +173,35 @@ public final class MainActivity extends Activity {
         Object service = getSystemService(Context.INPUT_METHOD_SERVICE);
         if (service instanceof InputMethodManager) ((InputMethodManager)service).hideSoftInputFromWindow(message.getWindowToken(), 0);
         String draft = message.getText().toString().trim();
-        String url = "https://wa.me/" + digits;
-        if (!draft.isEmpty()) url += "?text=" + Uri.encode(draft);
-        try {
-            Intent chatIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-            startActivity(Intent.createChooser(chatIntent, "Choose WhatsApp account"));
-        } catch (ActivityNotFoundException ex) {
-            Toast.makeText(this, "No app is available to open this chat.", Toast.LENGTH_LONG).show();
-        }
+        pendingChatUrl = "https://wa.me/" + digits;
+        if (!draft.isEmpty()) pendingChatUrl += "?text=" + Uri.encode(draft);
+        showAccountPicker();
+    }
+
+    private void showAccountPicker() {
+        new AlertDialog.Builder(this)
+                .setTitle("Choose WhatsApp account")
+                .setItems(new String[]{"WhatsApp", "WhatsApp Business", "Vivo cloned WhatsApp"}, (dialog, which) -> {
+                    if (which == 2) {
+                        new AlertDialog.Builder(this)
+                                .setTitle("Open the Vivo clone")
+                                .setMessage("Vivo runs its cloned WhatsApp in a separate phone profile. Android does not let this app target that clone directly. Open the cloned WhatsApp icon on your home screen to continue there.")
+                                .setPositiveButton("OK", null)
+                                .show();
+                        return;
+                    }
+                    String packageName = which == 0 ? "com.whatsapp" : "com.whatsapp.w4b";
+                    Intent chatIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(pendingChatUrl));
+                    chatIntent.setPackage(packageName);
+                    try {
+                        startActivity(chatIntent);
+                    } catch (ActivityNotFoundException ex) {
+                        String appName = which == 0 ? "WhatsApp" : "WhatsApp Business";
+                        Toast.makeText(this, appName + " is not installed or available on this profile.", Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private LinearLayout step(String number, String caption) {
