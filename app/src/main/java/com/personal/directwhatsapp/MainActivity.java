@@ -1,7 +1,7 @@
 package com.personal.directwhatsapp;
 
 import android.app.Activity;
-import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -13,6 +13,8 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
@@ -30,7 +32,7 @@ public final class MainActivity extends Activity {
     private static final int LIME = Color.rgb(206, 239, 132);
     private static final int PAGE = Color.rgb(246, 248, 245);
     private static final int LINE = Color.rgb(225, 233, 227);
-    private EditText phone, message;
+    private EditText phone;
     private Spinner country;
     private TextView error;
     private String pendingChatUrl;
@@ -76,11 +78,11 @@ public final class MainActivity extends Activity {
 
         TextView eyebrow = text("QUICK WHATSAPP CHAT", 11, GREEN, true);
         eyebrow.setLetterSpacing(.13f);
-        LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2); ep.topMargin = dp(40); page.addView(eyebrow, ep);
-        TextView title = text("Start a chat,\nwithout saving.", 35, INK, true);
-        title.setLetterSpacing(-.045f);
+        LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2); ep.topMargin = dp(30); page.addView(eyebrow, ep);
+        TextView title = text("Message without\nsaving a number.", 33, INK, true);
+        title.setLetterSpacing(-.035f);
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2); hp.topMargin = dp(12); page.addView(title, hp);
-        TextView intro = text("Enter a phone number and open a conversation in the WhatsApp account you choose.", 15, MUTED, false);
+        TextView intro = text("Enter a number, choose an account, then write your message in WhatsApp.", 14, MUTED, false);
         intro.setLineSpacing(dp(4), 1f);
         LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, -2); ip.topMargin = dp(11); ip.bottomMargin = dp(22); page.addView(intro, ip);
 
@@ -90,7 +92,7 @@ public final class MainActivity extends Activity {
         card.setElevation(dp(3));
         page.addView(card, new LinearLayout.LayoutParams(-1, -2));
         card.addView(text("New conversation", 19, INK, true));
-        TextView cardSub = text("The number stays out of your contacts.", 12, MUTED, false);
+        TextView cardSub = text("Start a chat without adding a contact.", 12, MUTED, false);
         LinearLayout.LayoutParams csp = new LinearLayout.LayoutParams(-1, -2); csp.topMargin = dp(5); csp.bottomMargin = dp(20); card.addView(cardSub, csp);
 
         card.addView(label("PHONE NUMBER", "COUNTRY CODE INCLUDED"));
@@ -108,25 +110,14 @@ public final class MainActivity extends Activity {
         error = text("", 12, Color.rgb(181, 66, 53), false);
         LinearLayout.LayoutParams er = new LinearLayout.LayoutParams(-1, -2); er.topMargin = dp(5); card.addView(error, er);
 
-        LinearLayout msgLabel = row();
-        LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-1, -2); ml.topMargin = dp(18); card.addView(msgLabel, ml);
-        msgLabel.addView(text("MESSAGE", 11, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
-        msgLabel.addView(text("OPTIONAL", 10, MUTED, true));
-        message = input("Write a message…", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        message.setGravity(Gravity.TOP | Gravity.START);
-        message.setMinLines(3);
-        message.setSingleLine(false);
-        message.setPadding(dp(14), dp(13), dp(14), dp(13));
-        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-1, dp(104)); mp.topMargin = dp(8); card.addView(message, mp);
-
-        TextView open = text("Choose WhatsApp account", 15, Color.WHITE, true);
+        TextView open = text("Continue to WhatsApp", 15, Color.WHITE, true);
         open.setGravity(Gravity.CENTER);
         open.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null);
         open.setBackground(round(DARK_GREEN, 16));
         open.setElevation(dp(2));
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(56)); bp.topMargin = dp(18); card.addView(open, bp);
         open.setOnClickListener(v -> openChat());
-        TextView hint = text("WhatsApp · Business · Vivo clone, if available", 11, MUTED, false);
+        TextView hint = text("Choose WhatsApp or WhatsApp Business", 11, MUTED, false);
         hint.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams hn = new LinearLayout.LayoutParams(-1, -2); hn.topMargin = dp(10); card.addView(hint, hn);
 
@@ -149,7 +140,7 @@ public final class MainActivity extends Activity {
         TextView lock = text("✓", 14, GREEN, true); lock.setGravity(Gravity.CENTER);
         lock.setBackground(pill(Color.WHITE, 20));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(26), dp(26)); lp.rightMargin = dp(10); privacy.addView(lock, lp);
-        TextView privacyText = text("No account, contact access, or saved message history. Your draft is handed to WhatsApp only when you open the chat.", 11, MUTED, false);
+        TextView privacyText = text("No contacts or number history are saved. Write and send your message inside WhatsApp.", 11, MUTED, false);
         privacyText.setLineSpacing(dp(2), 1f);
         privacy.addView(privacyText, new LinearLayout.LayoutParams(0, -2, 1));
         setContentView(scroll);
@@ -171,37 +162,91 @@ public final class MainActivity extends Activity {
         }
         error.setText("");
         Object service = getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (service instanceof InputMethodManager) ((InputMethodManager)service).hideSoftInputFromWindow(message.getWindowToken(), 0);
-        String draft = message.getText().toString().trim();
+        if (service instanceof InputMethodManager) ((InputMethodManager)service).hideSoftInputFromWindow(phone.getWindowToken(), 0);
         pendingChatUrl = "https://wa.me/" + digits;
-        if (!draft.isEmpty()) pendingChatUrl += "?text=" + Uri.encode(draft);
         showAccountPicker();
     }
 
     private void showAccountPicker() {
-        new AlertDialog.Builder(this)
-                .setTitle("Choose WhatsApp account")
-                .setItems(new String[]{"WhatsApp", "WhatsApp Business", "Vivo cloned WhatsApp"}, (dialog, which) -> {
-                    if (which == 2) {
-                        new AlertDialog.Builder(this)
-                                .setTitle("Open the Vivo clone")
-                                .setMessage("Vivo runs its cloned WhatsApp in a separate phone profile. Android does not let this app target that clone directly. Open the cloned WhatsApp icon on your home screen to continue there.")
-                                .setPositiveButton("OK", null)
-                                .show();
-                        return;
-                    }
-                    String packageName = which == 0 ? "com.whatsapp" : "com.whatsapp.w4b";
-                    Intent chatIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(pendingChatUrl));
-                    chatIntent.setPackage(packageName);
-                    try {
-                        startActivity(chatIntent);
-                    } catch (ActivityNotFoundException ex) {
-                        String appName = which == 0 ? "WhatsApp" : "WhatsApp Business";
-                        Toast.makeText(this, appName + " is not installed or available on this profile.", Toast.LENGTH_LONG).show();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        Dialog dialog = new Dialog(this);
+        LinearLayout sheet = column();
+        sheet.setPadding(dp(22), dp(17), dp(22), dp(20));
+        sheet.setBackground(round(Color.WHITE, 26));
+        View handle = new View(this);
+        handle.setBackground(round(Color.rgb(218, 226, 220), 4));
+        LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(dp(38), dp(4));
+        handleParams.gravity = Gravity.CENTER_HORIZONTAL;
+        handleParams.bottomMargin = dp(20);
+        sheet.addView(handle, handleParams);
+        TextView eyebrow = text("OPEN CHAT WITH", 10, GREEN, true);
+        eyebrow.setLetterSpacing(.12f);
+        sheet.addView(eyebrow);
+        TextView title = text("Choose an account", 23, INK, true);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+        titleParams.topMargin = dp(5);
+        sheet.addView(title, titleParams);
+        TextView subtitle = text("Your number opens directly in your chosen app.", 13, MUTED, false);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
+        subtitleParams.topMargin = dp(4);
+        subtitleParams.bottomMargin = dp(17);
+        sheet.addView(subtitle, subtitleParams);
+        sheet.addView(accountChoice(dialog, "W", "WhatsApp", "Personal account", DARK_GREEN, "com.whatsapp"));
+        LinearLayout.LayoutParams businessParams = new LinearLayout.LayoutParams(-1, -2);
+        businessParams.topMargin = dp(10);
+        sheet.addView(accountChoice(dialog, "B", "WhatsApp Business", "Business account", GREEN, "com.whatsapp.w4b"), businessParams);
+        TextView cancel = text("Cancel", 14, MUTED, true);
+        cancel.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(-1, dp(48));
+        cancelParams.topMargin = dp(8);
+        sheet.addView(cancel, cancelParams);
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        dialog.setContentView(sheet);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.width = getResources().getDisplayMetrics().widthPixels - dp(28);
+            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+            params.dimAmount = .38f;
+            window.setAttributes(params);
+        }
+        dialog.show();
+        if (window != null) window.setLayout(getResources().getDisplayMetrics().widthPixels - dp(28), WindowManager.LayoutParams.WRAP_CONTENT);
+    }
+
+    private LinearLayout accountChoice(Dialog dialog, String mark, String title, String subtitle, int accent, String packageName) {
+        LinearLayout option = row();
+        option.setPadding(dp(13), dp(12), dp(13), dp(12));
+        option.setBackground(fieldBackground());
+        TextView badge = text(mark, 17, Color.WHITE, true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setBackground(round(accent, 16));
+        LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(44), dp(44));
+        badgeParams.rightMargin = dp(12);
+        option.addView(badge, badgeParams);
+        LinearLayout copy = column();
+        copy.addView(text(title, 15, INK, true));
+        TextView detail = text(subtitle, 12, MUTED, false);
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-1, -2);
+        detailParams.topMargin = dp(3);
+        copy.addView(detail, detailParams);
+        option.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView arrow = text("›", 26, MUTED, false);
+        option.addView(arrow);
+        option.setOnClickListener(v -> {
+            dialog.dismiss();
+            Intent chatIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(pendingChatUrl));
+            chatIntent.setPackage(packageName);
+            try {
+                startActivity(chatIntent);
+            } catch (ActivityNotFoundException ex) {
+                String appName = "com.whatsapp".equals(packageName) ? "WhatsApp" : "WhatsApp Business";
+                Toast.makeText(this, appName + " is not installed or available on this profile.", Toast.LENGTH_LONG).show();
+            }
+        });
+        return option;
     }
 
     private LinearLayout step(String number, String caption) {
