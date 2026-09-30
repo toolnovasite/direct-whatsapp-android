@@ -12,3 +12,7 @@ android {
         versionName = "1.3"
     }
 }
+
+dependencies {
+    implementation("com.googlecode.libphonenumber:libphonenumber:9.0.39")
+}
