@@ -32,6 +32,7 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -45,6 +46,10 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdSize;
+import com.google.android.gms.ads.AdView;
+import com.google.android.gms.ads.MobileAds;
 import com.google.i18n.phonenumbers.NumberParseException;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.Phonenumber;
@@ -73,6 +78,8 @@ public final class MainActivity extends Activity {
     private String[] countries;
     private String[] prefixes;
     private Switch saveHistorySwitch;
+    private FrameLayout bannerAdContainer;
+    private AdView bannerAdView;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -81,6 +88,7 @@ public final class MainActivity extends Activity {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         prepareCountries();
         buildScreen();
+        MobileAds.initialize(this, initializationStatus -> loadBannerAd());
         handleIncomingNumber(getIntent());
         openRecentCallsFromShortcut(getIntent());
     }
@@ -265,7 +273,35 @@ public final class MainActivity extends Activity {
         TextView privacyText = text("Numbers are only saved if you turn on local history. Call log is read only when requested.", 11, MUTED, false);
         privacyText.setLineSpacing(dp(2), 1f);
         privacy.addView(privacyText, new LinearLayout.LayoutParams(0, -2, 1));
+
+        bannerAdContainer = new FrameLayout(this);
+        LinearLayout.LayoutParams adContainerParams = new LinearLayout.LayoutParams(-1, -2);
+        adContainerParams.topMargin = dp(14);
+        adContainerParams.gravity = Gravity.CENTER_HORIZONTAL;
+        page.addView(bannerAdContainer, adContainerParams);
         setContentView(scroll);
+    }
+
+    private void loadBannerAd() {
+        if (bannerAdContainer == null || isFinishing()) return;
+        bannerAdView = new AdView(this);
+        bannerAdView.setAdUnitId(AdMobConfig.TEST_BANNER_AD_UNIT_ID);
+        int availableWidthDp = (int) (getResources().getDisplayMetrics().widthPixels
+                / getResources().getDisplayMetrics().density) - 44;
+        bannerAdView.setAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
+                this, Math.max(1, availableWidthDp)));
+        bannerAdContainer.removeAllViews();
+        bannerAdContainer.addView(bannerAdView,
+                new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));
+        bannerAdView.loadAd(new AdRequest.Builder().build());
+    }
+
+    @Override protected void onDestroy() {
+        if (bannerAdView != null) {
+            bannerAdView.destroy();
+            bannerAdView = null;
+        }
+        super.onDestroy();
     }
 
     private void openChat() {
