@@ -365,19 +365,23 @@ public final class MainActivity extends Activity {
                 manager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
             }
         } catch (RuntimeException ignored) { }
+
+        String simRegion = null;
+        String networkRegion = null;
         if (manager != null) {
             try {
-                String simRegion = manager.getSimCountryIso();
-                if (isSupportedRegion(simRegion)) return simRegion.toUpperCase(Locale.ROOT);
+                simRegion = manager.getSimCountryIso();
             } catch (RuntimeException ignored) { }
             try {
-                String networkRegion = manager.getNetworkCountryIso();
-                if (isSupportedRegion(networkRegion)) return networkRegion.toUpperCase(Locale.ROOT);
+                networkRegion = manager.getNetworkCountryIso();
             } catch (RuntimeException ignored) { }
         }
-        String deviceRegion = Locale.getDefault().getCountry();
-        if (isSupportedRegion(deviceRegion)) return deviceRegion.toUpperCase(Locale.ROOT);
-        return "PK";
+
+        return CountryDetectionPolicy.chooseRegion(
+                simRegion,
+                networkRegion,
+                Locale.getDefault().getCountry(),
+                this::isSupportedRegion);
     }
 
     private boolean isSupportedRegion(String region) {

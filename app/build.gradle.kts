@@ -15,4 +15,5 @@ android {
 
 dependencies {
     implementation("com.googlecode.libphonenumber:libphonenumber:9.0.39")
+    testImplementation("junit:junit:4.13.2")
 }
