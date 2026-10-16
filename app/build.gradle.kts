@@ -15,5 +15,6 @@ android {
 
 dependencies {
     implementation("com.googlecode.libphonenumber:libphonenumber:9.0.39")
+    implementation("com.google.android.gms:play-services-ads:25.5.0")
     testImplementation("junit:junit:4.13.2")
 }
