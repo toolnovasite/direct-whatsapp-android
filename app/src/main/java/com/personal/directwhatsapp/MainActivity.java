@@ -274,12 +274,34 @@ public final class MainActivity extends Activity {
         privacyText.setLineSpacing(dp(2), 1f);
         privacy.addView(privacyText, new LinearLayout.LayoutParams(0, -2, 1));
 
+        LinearLayout legalLinks = row();
+        legalLinks.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams legalParams = new LinearLayout.LayoutParams(-1, -2);
+        legalParams.topMargin = dp(10);
+        page.addView(legalLinks, legalParams);
+        TextView privacyLink = text("Privacy Policy", 11, GREEN, true);
+        TextView termsLink = text("Terms of Use", 11, GREEN, true);
+        privacyLink.setPadding(dp(10), dp(8), dp(10), dp(8));
+        termsLink.setPadding(dp(10), dp(8), dp(10), dp(8));
+        legalLinks.addView(privacyLink);
+        legalLinks.addView(termsLink);
+        privacyLink.setOnClickListener(v -> openLegalPage("https://toolnovasite.github.io/direct-whatsapp-android/privacy-policy.html"));
+        termsLink.setOnClickListener(v -> openLegalPage("https://toolnovasite.github.io/direct-whatsapp-android/terms.html"));
+
         bannerAdContainer = new FrameLayout(this);
         LinearLayout.LayoutParams adContainerParams = new LinearLayout.LayoutParams(-1, -2);
         adContainerParams.topMargin = dp(14);
         adContainerParams.gravity = Gravity.CENTER_HORIZONTAL;
         page.addView(bannerAdContainer, adContainerParams);
         setContentView(scroll);
+    }
+
+    private void openLegalPage(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (ActivityNotFoundException ex) {
+            Toast.makeText(this, "Could not open the policy page.", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void loadBannerAd() {
