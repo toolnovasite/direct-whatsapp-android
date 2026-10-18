@@ -307,7 +307,7 @@ public final class MainActivity extends Activity {
     private void loadBannerAd() {
         if (bannerAdContainer == null || isFinishing()) return;
         bannerAdView = new AdView(this);
-        bannerAdView.setAdUnitId(AdMobConfig.TEST_BANNER_AD_UNIT_ID);
+        bannerAdView.setAdUnitId(AdMobConfig.BANNER_AD_UNIT_ID);
         int availableWidthDp = (int) (getResources().getDisplayMetrics().widthPixels
                 / getResources().getDisplayMetrics().density) - 44;
         bannerAdView.setAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
