@@ -12,8 +12,8 @@ public final class AdMobConfigTest {
     }
 
     @Test
-    public void developmentUsesGoogleDemoBannerAdUnit() {
-        assertEquals("ca-app-pub-3940256099942544/9214589741",
-                AdMobConfig.TEST_BANNER_AD_UNIT_ID);
+    public void productionBannerUsesConfiguredAdUnit() {
+        assertEquals("ca-app-pub-2486732565949048/1291165743",
+                AdMobConfig.BANNER_AD_UNIT_ID);
     }
 }
