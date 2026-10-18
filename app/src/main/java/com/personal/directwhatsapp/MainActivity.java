@@ -417,11 +417,11 @@ public final class MainActivity extends Activity {
 
     private String detectCountryRegion() {
         TelephonyManager manager = null;
+        // Some devices (including OEM variants) do not report the subscription/radio
+        // feature flags consistently. Asking for the service is safe without extra
+        // permissions; the ISO getters below are guarded for devices without telephony.
         try {
-            if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION)
-                    || getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)) {
-                manager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
-            }
+            manager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
         } catch (RuntimeException ignored) { }
 
         String simRegion = null;
