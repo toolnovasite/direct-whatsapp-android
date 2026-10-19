@@ -7,14 +7,15 @@ import java.util.List;
 import org.junit.Test;
 
 public final class CountryDetectionPolicyTest {
-    private static final List<String> SUPPORTED = Arrays.asList("PK", "US", "GB", "AE");
+    private static final List<String> SUPPORTED =
+            Arrays.asList("PK", "US", "GB", "AE", "IN");
 
     private final CountryDetectionPolicy.RegionSupport support =
             region -> SUPPORTED.contains(region);
 
     @Test
-    public void prefersSupportedSimRegion() {
-        assertEquals("PK", CountryDetectionPolicy.chooseRegion("pk", "AE", "US", support));
+    public void prefersSupportedSimRegionOverNetworkAndDeviceRegion() {
+        assertEquals("GB", CountryDetectionPolicy.chooseRegion("gb", "PK", "US", support));
     }
 
     @Test
@@ -25,16 +26,23 @@ public final class CountryDetectionPolicyTest {
 
     @Test
     public void usesDeviceRegionWhenSimAndNetworkAreUnavailable() {
-        assertEquals("GB", CountryDetectionPolicy.chooseRegion(null, "", "gb", support));
+        assertEquals("US", CountryDetectionPolicy.chooseRegion(null, "", "us", support));
     }
 
     @Test
     public void fallsBackToPakistanWhenNoCandidateIsSupported() {
         assertEquals("PK", CountryDetectionPolicy.chooseRegion(null, "XX", "ZZ", support));
+        assertEquals("PK", CountryDetectionPolicy.chooseRegion(null, null, null, support));
     }
 
     @Test
     public void normalizesSupportedCandidatesToUppercase() {
-        assertEquals("US", CountryDetectionPolicy.chooseRegion("us", null, "PK", support));
+        assertEquals("IN", CountryDetectionPolicy.chooseRegion("in", null, "PK", support));
+    }
+
+    @Test
+    public void rejectsCandidatesThatAreNotTwoLetterSupportedRegions() {
+        assertEquals("AE", CountryDetectionPolicy.chooseRegion("USA", "ae", "PK", support));
+        assertEquals("PK", CountryDetectionPolicy.chooseRegion("U", "XX", "ZZ", support));
     }
 }
