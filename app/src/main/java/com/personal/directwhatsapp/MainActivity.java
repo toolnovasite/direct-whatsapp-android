@@ -62,13 +62,18 @@ public final class MainActivity extends Activity {
     private static final String PREFS_NAME = "direct_preferences";
     private static final String PREF_SAVE_HISTORY = "save_recent_numbers";
     private static final String PREF_RECENT_NUMBERS = "recent_numbers";
-    private static final int INK = Color.rgb(24, 37, 32);
-    private static final int MUTED = Color.rgb(105, 119, 111);
-    private static final int GREEN = Color.rgb(23, 132, 88);
-    private static final int DARK_GREEN = Color.rgb(16, 52, 40);
-    private static final int LIME = Color.rgb(206, 239, 132);
-    private static final int PAGE = Color.rgb(246, 248, 245);
-    private static final int LINE = Color.rgb(225, 233, 227);
+    private static final String PREF_DARK_MODE = "dark_mode";
+    private int INK;
+    private int MUTED;
+    private int GREEN;
+    private int DARK_GREEN;
+    private int LIME;
+    private int PAGE;
+    private int LINE;
+    private int PANEL_COLOR;
+    private int FIELD_COLOR;
+    private int SOFT_GREEN;
+    private int PRIVACY_COLOR;
     private EditText phone;
     private Spinner country;
     private TextView error;
@@ -83,9 +88,10 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        applyThemeColors();
         getWindow().setStatusBarColor(PAGE);
         getWindow().setNavigationBarColor(PAGE);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        updateSystemBarIcons();
         prepareCountries();
         buildScreen();
         MobileAds.initialize(this, initializationStatus -> loadBannerAd());
@@ -117,16 +123,24 @@ public final class MainActivity extends Activity {
         header.addView(mark, new LinearLayout.LayoutParams(dp(44), dp(44)));
         LinearLayout brand = column();
         brand.setPadding(dp(11), 0, 0, 0);
-        brand.addView(text("direct", 19, INK, true));
+        brand.addView(text("Direct Chat", 19, INK, true));
         TextView tagline = text("WHATSAPP, WITHOUT THE CONTACT", 9, MUTED, true);
         tagline.setLetterSpacing(.08f);
         LinearLayout.LayoutParams tg = new LinearLayout.LayoutParams(-2, -2); tg.topMargin = dp(2); brand.addView(tagline, tg);
         header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
         TextView privatePill = text("●  PRIVATE", 10, GREEN, true);
         privatePill.setGravity(Gravity.CENTER);
-        privatePill.setPadding(dp(11), dp(8), dp(11), dp(8));
-        privatePill.setBackground(pill(Color.rgb(232, 243, 235), 30));
-        header.addView(privatePill);
+        privatePill.setPadding(dp(10), dp(8), dp(10), dp(8));
+        privatePill.setBackground(pill(SOFT_GREEN, 30));
+        LinearLayout.LayoutParams privateParams = new LinearLayout.LayoutParams(-2, -2);
+        privateParams.rightMargin = dp(8);
+        header.addView(privatePill, privateParams);
+        TextView settingsButton = text("⚙", 22, INK, true);
+        settingsButton.setGravity(Gravity.CENTER);
+        settingsButton.setContentDescription("Settings");
+        settingsButton.setBackground(pill(FIELD_COLOR, 16));
+        header.addView(settingsButton, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        settingsButton.setOnClickListener(v -> showSettingsDialog());
         page.addView(header);
 
         TextView eyebrow = text("QUICK WHATSAPP CHAT", 11, GREEN, true);
@@ -152,7 +166,7 @@ public final class MainActivity extends Activity {
         phoneHeader.addView(text("PHONE NUMBER", 11, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
         TextView autoCountry = text("AUTO", 10, GREEN, true);
         autoCountry.setPadding(dp(10), dp(6), dp(10), dp(6));
-        autoCountry.setBackground(pill(Color.rgb(232, 243, 235), 20));
+        autoCountry.setBackground(pill(SOFT_GREEN, 20));
         phoneHeader.addView(autoCountry);
         autoCountry.setOnClickListener(v -> {
             int detected = getDetectedCountryIndex();
@@ -166,12 +180,12 @@ public final class MainActivity extends Activity {
         card.addView(numberTools, toolsParams);
         TextView recentCalls = text("◷   Recent calls", 12, DARK_GREEN, true);
         recentCalls.setGravity(Gravity.CENTER);
-        recentCalls.setBackground(pill(Color.rgb(232, 243, 235), 13));
+        recentCalls.setBackground(pill(SOFT_GREEN, 13));
         numberTools.addView(recentCalls, new LinearLayout.LayoutParams(0, -1, 1));
         recentCalls.setOnClickListener(v -> openRecentCalls());
         TextView paste = text("▣   Paste", 12, GREEN, true);
         paste.setGravity(Gravity.CENTER);
-        paste.setBackground(pill(Color.rgb(242, 246, 242), 13));
+        paste.setBackground(pill(FIELD_COLOR, 13));
         LinearLayout.LayoutParams pasteParams = new LinearLayout.LayoutParams(0, -1, 1);
         pasteParams.leftMargin = dp(8);
         numberTools.addView(paste, pasteParams);
@@ -216,6 +230,12 @@ public final class MainActivity extends Activity {
         TextView hint = text("Choose WhatsApp or WhatsApp Business", 11, MUTED, false);
         hint.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams hn = new LinearLayout.LayoutParams(-1, -2); hn.topMargin = dp(10); card.addView(hint, hn);
+
+        bannerAdContainer = new FrameLayout(this);
+        LinearLayout.LayoutParams adContainerParams = new LinearLayout.LayoutParams(-1, -2);
+        adContainerParams.topMargin = dp(12);
+        adContainerParams.gravity = Gravity.CENTER_HORIZONTAL;
+        card.addView(bannerAdContainer, adContainerParams);
 
         LinearLayout historyRow = row();
         LinearLayout.LayoutParams historyParams = new LinearLayout.LayoutParams(-1, -2);
@@ -265,7 +285,7 @@ public final class MainActivity extends Activity {
         LinearLayout privacy = row();
         privacy.setGravity(Gravity.CENTER_VERTICAL);
         privacy.setPadding(dp(13), dp(12), dp(13), dp(12));
-        privacy.setBackground(pill(Color.rgb(235, 241, 236), 14));
+        privacy.setBackground(pill(PRIVACY_COLOR, 14));
         LinearLayout.LayoutParams prv = new LinearLayout.LayoutParams(-1, -2); prv.topMargin = dp(16); page.addView(privacy, prv);
         TextView lock = text("✓", 14, GREEN, true); lock.setGravity(Gravity.CENTER);
         lock.setBackground(pill(Color.WHITE, 20));
@@ -274,25 +294,7 @@ public final class MainActivity extends Activity {
         privacyText.setLineSpacing(dp(2), 1f);
         privacy.addView(privacyText, new LinearLayout.LayoutParams(0, -2, 1));
 
-        LinearLayout legalLinks = row();
-        legalLinks.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams legalParams = new LinearLayout.LayoutParams(-1, -2);
-        legalParams.topMargin = dp(10);
-        page.addView(legalLinks, legalParams);
-        TextView privacyLink = text("Privacy Policy", 11, GREEN, true);
-        TextView termsLink = text("Terms of Use", 11, GREEN, true);
-        privacyLink.setPadding(dp(10), dp(8), dp(10), dp(8));
-        termsLink.setPadding(dp(10), dp(8), dp(10), dp(8));
-        legalLinks.addView(privacyLink);
-        legalLinks.addView(termsLink);
-        privacyLink.setOnClickListener(v -> openLegalPage("https://toolnovasite.github.io/direct-whatsapp-android/privacy-policy.html"));
-        termsLink.setOnClickListener(v -> openLegalPage("https://toolnovasite.github.io/direct-whatsapp-android/terms.html"));
 
-        bannerAdContainer = new FrameLayout(this);
-        LinearLayout.LayoutParams adContainerParams = new LinearLayout.LayoutParams(-1, -2);
-        adContainerParams.topMargin = dp(14);
-        adContainerParams.gravity = Gravity.CENTER_HORIZONTAL;
-        page.addView(bannerAdContainer, adContainerParams);
         setContentView(scroll);
     }
 
@@ -600,7 +602,7 @@ public final class MainActivity extends Activity {
         Dialog dialog = new Dialog(this);
         LinearLayout sheet = column();
         sheet.setPadding(dp(22), dp(18), dp(22), dp(18));
-        sheet.setBackground(round(Color.WHITE, 24));
+        sheet.setBackground(round(PANEL_COLOR, 24));
         TextView title = text("Choose a number", 21, INK, true);
         sheet.addView(title);
         TextView subtitle = text("Select a call or saved number to fill the phone field.", 12, MUTED, false);
@@ -698,9 +700,9 @@ public final class MainActivity extends Activity {
         Dialog dialog = new Dialog(this);
         LinearLayout sheet = column();
         sheet.setPadding(dp(22), dp(17), dp(22), dp(20));
-        sheet.setBackground(round(Color.WHITE, 26));
+        sheet.setBackground(round(PANEL_COLOR, 26));
         View handle = new View(this);
-        handle.setBackground(round(Color.rgb(218, 226, 220), 4));
+        handle.setBackground(round(LINE, 4));
         LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(dp(38), dp(4));
         handleParams.gravity = Gravity.CENTER_HORIZONTAL;
         handleParams.bottomMargin = dp(20);
@@ -808,8 +810,104 @@ public final class MainActivity extends Activity {
     private TextView text(String value, int size, int color, boolean bold) { TextView t = new TextView(this); t.setText(value); t.setTextSize(size); t.setTextColor(color); if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD); return t; }
     private GradientDrawable round(int color, int radius) { GradientDrawable d = new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(radius)); return d; }
     private GradientDrawable pill(int color, int radius) { return round(color, radius); }
-    private GradientDrawable fieldBackground() { GradientDrawable d = round(Color.rgb(248, 250, 248), 13); d.setStroke(dp(1), LINE); return d; }
-    private GradientDrawable panel() { GradientDrawable d = round(Color.WHITE, 22); d.setStroke(dp(1), Color.rgb(234, 239, 235)); return d; }
+    private GradientDrawable fieldBackground() { GradientDrawable d = round(FIELD_COLOR, 13); d.setStroke(dp(1), LINE); return d; }
+    private GradientDrawable panel() { GradientDrawable d = round(PANEL_COLOR, 22); d.setStroke(dp(1), LINE); return d; }
+
+    private void applyThemeColors() {
+        boolean dark = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_DARK_MODE, false);
+        if (dark) {
+            INK = Color.rgb(235, 242, 237);
+            MUTED = Color.rgb(174, 190, 180);
+            GREEN = Color.rgb(111, 211, 160);
+            DARK_GREEN = Color.rgb(19, 70, 53);
+            LIME = Color.rgb(206, 239, 132);
+            PAGE = Color.rgb(18, 27, 23);
+            LINE = Color.rgb(55, 72, 62);
+            PANEL_COLOR = Color.rgb(29, 41, 34);
+            FIELD_COLOR = Color.rgb(35, 49, 41);
+            SOFT_GREEN = Color.rgb(35, 61, 47);
+            PRIVACY_COLOR = Color.rgb(34, 48, 39);
+        } else {
+            INK = Color.rgb(24, 37, 32);
+            MUTED = Color.rgb(105, 119, 111);
+            GREEN = Color.rgb(23, 132, 88);
+            DARK_GREEN = Color.rgb(16, 52, 40);
+            LIME = Color.rgb(206, 239, 132);
+            PAGE = Color.rgb(246, 248, 245);
+            LINE = Color.rgb(225, 233, 227);
+            PANEL_COLOR = Color.WHITE;
+            FIELD_COLOR = Color.rgb(248, 250, 248);
+            SOFT_GREEN = Color.rgb(232, 243, 235);
+            PRIVACY_COLOR = Color.rgb(235, 241, 236);
+        }
+    }
+
+    private void updateSystemBarIcons() {
+        boolean dark = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_DARK_MODE, false);
+        getWindow().getDecorView().setSystemUiVisibility(dark ? 0 :
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+    }
+
+    private void showSettingsDialog() {
+        Dialog dialog = new Dialog(this);
+        LinearLayout content = column();
+        content.setPadding(dp(22), dp(20), dp(22), dp(18));
+        content.setBackground(round(PANEL_COLOR, 24));
+        content.addView(text("Settings", 22, INK, true));
+        TextView subtitle = text("Appearance and legal information", 13, MUTED, false);
+        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
+        subParams.topMargin = dp(4);
+        subParams.bottomMargin = dp(14);
+        content.addView(subtitle, subParams);
+
+        LinearLayout themeRow = row();
+        themeRow.setPadding(0, dp(8), 0, dp(8));
+        LinearLayout themeCopy = column();
+        themeCopy.addView(text("Dark mode", 15, INK, true));
+        TextView themeDescription = text("Switch between day and night appearance", 11, MUTED, false);
+        LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(-1, -2);
+        descParams.topMargin = dp(3);
+        themeCopy.addView(themeDescription, descParams);
+        themeRow.addView(themeCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        Switch darkSwitch = new Switch(this);
+        darkSwitch.setChecked(getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_DARK_MODE, false));
+        themeRow.addView(darkSwitch);
+        content.addView(themeRow);
+        darkSwitch.setOnCheckedChangeListener((button, enabled) -> {
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean(PREF_DARK_MODE, enabled).apply();
+            dialog.dismiss();
+            recreate();
+        });
+
+        TextView privacy = text("Privacy Policy   ›", 15, GREEN, true);
+        privacy.setPadding(0, dp(14), 0, dp(14));
+        content.addView(privacy);
+        privacy.setOnClickListener(v -> { dialog.dismiss(); openLegalPage("https://toolnovasite.github.io/direct-whatsapp-android/privacy-policy.html"); });
+        TextView terms = text("Terms of Use   ›", 15, GREEN, true);
+        terms.setPadding(0, dp(14), 0, dp(14));
+        content.addView(terms);
+        terms.setOnClickListener(v -> { dialog.dismiss(); openLegalPage("https://toolnovasite.github.io/direct-whatsapp-android/terms.html"); });
+        TextView close = text("Close", 14, MUTED, true);
+        close.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-1, dp(44));
+        closeParams.topMargin = dp(6);
+        content.addView(close, closeParams);
+        close.setOnClickListener(v -> dialog.dismiss());
+        dialog.setContentView(content);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.width = getResources().getDisplayMetrics().widthPixels - dp(36);
+            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            params.gravity = Gravity.CENTER;
+            params.dimAmount = .35f;
+            window.setAttributes(params);
+        }
+        dialog.show();
+        if (window != null) window.setLayout(getResources().getDisplayMetrics().widthPixels - dp(36), WindowManager.LayoutParams.WRAP_CONTENT);
+    }
     private int dp(int value) { return (int)(value * getResources().getDisplayMetrics().density + .5f); }
 }
 
