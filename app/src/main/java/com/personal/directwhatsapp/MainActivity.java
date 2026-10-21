@@ -150,7 +150,7 @@ public final class MainActivity extends Activity {
         TextView eyebrow = text("QUICK WHATSAPP CHAT", 11, GREEN, true);
         eyebrow.setLetterSpacing(.13f);
         LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2); ep.topMargin = dp(22); page.addView(eyebrow, ep);
-        TextView title = text("Message without\\nsaving a number.", 30, INK, true);
+        TextView title = text("Message without\nsaving a number.", 30, INK, true);
         title.setLetterSpacing(-.035f);
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2); hp.topMargin = dp(12); page.addView(title, hp);
         TextView intro = text("Enter a number, choose an account, then write your message in WhatsApp.", 14, MUTED, false);
