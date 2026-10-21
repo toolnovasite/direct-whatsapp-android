@@ -1,26 +1,17 @@
 package com.personal.directwhatsapp;
 
-import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipboardManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.content.pm.ShortcutInfo;
-import android.content.pm.ShortcutManager;
-import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.Icon;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.provider.CallLog;
 import android.telephony.TelephonyManager;
 import android.text.Editable;
 import android.text.InputType;
@@ -39,13 +30,10 @@ import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.AdSize;
 import com.google.android.gms.ads.AdView;
@@ -57,8 +45,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class MainActivity extends Activity {
-    private static final int CALL_LOG_PERMISSION_REQUEST = 41;
-    private static final String EXTRA_OPEN_RECENT_CALLS = "open_recent_calls";
     private static final String PREFS_NAME = "direct_preferences";
     private static final String PREF_SAVE_HISTORY = "save_recent_numbers";
     private static final String PREF_RECENT_NUMBERS = "recent_numbers";
@@ -104,14 +90,12 @@ public final class MainActivity extends Activity {
         buildScreen();
         MobileAds.initialize(this, initializationStatus -> loadBannerAd());
         handleIncomingNumber(getIntent());
-        openRecentCallsFromShortcut(getIntent());
     }
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
         handleIncomingNumber(intent);
-        openRecentCallsFromShortcut(intent);
     }
 
     private void buildScreen() {
@@ -182,11 +166,12 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams toolsParams = new LinearLayout.LayoutParams(-1, dp(44));
         toolsParams.topMargin = dp(9);
         card.addView(numberTools, toolsParams);
-        TextView recentCalls = text("◷   Recent calls", 12, DARK_GREEN, true);
+        TextView recentCalls = text("◷   Saved numbers", 12, DARK_GREEN, true);
         recentCalls.setGravity(Gravity.CENTER);
+        recentCalls.setContentDescription("Open saved numbers");
         recentCalls.setBackground(pill(SOFT_GREEN, 13));
         numberTools.addView(recentCalls, new LinearLayout.LayoutParams(0, -1, 1));
-        recentCalls.setOnClickListener(v -> openRecentCalls());
+        recentCalls.setOnClickListener(v -> switchTab("recent"));
         TextView paste = text("▣   Paste", 12, GREEN, true);
         paste.setGravity(Gravity.CENTER);
         paste.setBackground(pill(FIELD_COLOR, 13));
@@ -378,13 +363,7 @@ public final class MainActivity extends Activity {
 
     private void buildRecentPage(LinearLayout content) {
         addPageHeader(content, "YOUR ACTIVITY", "Recent numbers",
-                "Use a saved number again, or choose one from your phone's call log.");
-        TextView callLog = primaryAction("Choose from Recent Calls");
-        LinearLayout.LayoutParams callLogParams = new LinearLayout.LayoutParams(-1, -2);
-        callLogParams.bottomMargin = dp(7);
-        content.addView(callLog, callLogParams);
-        callLog.setOnClickListener(v -> openRecentCalls());
-
+                "Reuse numbers you chose to save locally. You can also enter, paste, or share a number into Direct Chat.");
         boolean historyEnabled = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_SAVE_HISTORY, false);
         List<String> numbers = getSavedNumberList();
         LinearLayout card = sectionCard(content, "Saved numbers",
@@ -489,7 +468,7 @@ public final class MainActivity extends Activity {
         sectionCard(content, "Country selection",
                 "We prefer your SIM country, then your mobile network country, then your device region. If those sources are unavailable, the app falls back to Pakistan. A number that starts with + can be used to detect its country code. You can still choose a country manually.");
         sectionCard(content, "Your privacy",
-                "Saving recent numbers is optional and off by default. If enabled, numbers are stored locally on this phone; turning the setting off clears that list. Call history is accessed only after you tap Recent Calls and approve Android's permission prompt.");
+                "Saving recent numbers is optional and off by default. If enabled, numbers are stored locally on this phone; turning the setting off clears that list. Direct Chat does not read your call log. You can type a number, paste it, or share a number into Direct Chat from another app.");
 
         LinearLayout helpCard = sectionCard(content, "Troubleshooting", "");
         addHelpRow(helpCard, "Country looks wrong", "Open the country field on Home and select the correct country code.");
@@ -572,12 +551,6 @@ public final class MainActivity extends Activity {
             historyHint.setText(enabled ? "Numbers you open will be stored only on this phone."
                     : "History is off; any previously saved numbers have been cleared.");
         });
-
-        LinearLayout convenience = sectionCard(content, "Quick access", "Optional shortcuts for features you use often.");
-        TextView shortcut = text("＋  Add Recent Calls shortcut", 14, GREEN, true);
-        shortcut.setPadding(0, dp(12), 0, dp(7));
-        convenience.addView(shortcut);
-        shortcut.setOnClickListener(v -> pinRecentCallsShortcut());
 
         LinearLayout legal = sectionCard(content, "Privacy and terms",
                 "Read how the app handles data and what to expect when using it.");
@@ -798,48 +771,6 @@ public final class MainActivity extends Activity {
         return numbers;
     }
 
-    private void showSavedNumbers() {
-        if (!getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_SAVE_HISTORY, false)) {
-            Toast.makeText(this, "Turn on Save recent numbers first.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        List<RecentCall> items = new ArrayList<>();
-        for (String number : getSavedNumberList()) items.add(new RecentCall(number, "Recent number", "saved on this phone"));
-        showRecentCalls(items);
-    }
-
-    private void pinRecentCallsShortcut() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            Toast.makeText(this, "Home-screen shortcuts need Android 8 or newer.", Toast.LENGTH_LONG).show();
-            return;
-        }
-        ShortcutManager shortcutManager = getSystemService(ShortcutManager.class);
-        if (shortcutManager == null || !shortcutManager.isRequestPinShortcutSupported()) {
-            Toast.makeText(this, "This launcher does not support pinned shortcuts.", Toast.LENGTH_LONG).show();
-            return;
-        }
-        Intent shortcutIntent = new Intent(this, MainActivity.class);
-        shortcutIntent.setAction("com.personal.directwhatsapp.OPEN_RECENT_CALLS");
-        shortcutIntent.putExtra(EXTRA_OPEN_RECENT_CALLS, true);
-        ShortcutInfo shortcut = new ShortcutInfo.Builder(this, "direct-recent-calls")
-                .setShortLabel("Recent calls")
-                .setLongLabel("Choose a number from Recent calls")
-                .setIcon(Icon.createWithResource(this, R.mipmap.ic_launcher))
-                .setIntent(shortcutIntent)
-                .build();
-        try {
-            shortcutManager.requestPinShortcut(shortcut, null);
-        } catch (RuntimeException ex) {
-            Toast.makeText(this, "Could not add the shortcut on this launcher.", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void openRecentCallsFromShortcut(Intent intent) {
-        if (intent != null && intent.getBooleanExtra(EXTRA_OPEN_RECENT_CALLS, false) && phone != null) {
-            phone.post(this::openRecentCalls);
-        }
-    }
-
     private static final class CountryOption {
         final String region;
         final String callingCode;
@@ -848,138 +779,6 @@ public final class MainActivity extends Activity {
             this.region = region;
             this.callingCode = callingCode;
             this.label = label;
-        }
-    }
-
-    private void openRecentCalls() {
-        if (Build.VERSION.SDK_INT < 23 || checkSelfPermission(Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED) {
-            showRecentCalls(readRecentCalls());
-            return;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("Allow Recent Calls access?")
-                .setMessage("Direct reads your recent call entries only when you open this picker, so you can choose a number. Direct does not save your call history.")
-                .setNegativeButton("Not now", (dialog, which) -> dialog.dismiss())
-                .setPositiveButton("Continue", (dialog, which) -> requestPermissions(
-                        new String[]{Manifest.permission.READ_CALL_LOG}, CALL_LOG_PERMISSION_REQUEST))
-                .show();
-    }
-
-    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != CALL_LOG_PERMISSION_REQUEST) return;
-        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            showRecentCalls(readRecentCalls());
-        } else {
-            Toast.makeText(this, "Call history access was not allowed. You can still share or paste a number.", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private List<RecentCall> readRecentCalls() {
-        List<RecentCall> calls = new ArrayList<>();
-        String[] columns = {CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NAME, CallLog.Calls.DATE};
-        Uri uri = CallLog.Calls.CONTENT_URI.buildUpon().appendQueryParameter("limit", "50").build();
-        try (Cursor cursor = getContentResolver().query(uri, columns, null, null, CallLog.Calls.DATE + " DESC")) {
-            if (cursor == null) return calls;
-            int numberIndex = cursor.getColumnIndex(CallLog.Calls.NUMBER);
-            int nameIndex = cursor.getColumnIndex(CallLog.Calls.CACHED_NAME);
-            int dateIndex = cursor.getColumnIndex(CallLog.Calls.DATE);
-            SimpleDateFormat formatter = new SimpleDateFormat("MMM d · h:mm a", Locale.getDefault());
-            while (cursor.moveToNext() && calls.size() < 50) {
-                String number = numberIndex >= 0 ? cursor.getString(numberIndex) : null;
-                if (number == null || number.trim().isEmpty()) continue;
-                String name = nameIndex >= 0 ? cursor.getString(nameIndex) : null;
-                long timestamp = dateIndex >= 0 ? cursor.getLong(dateIndex) : 0L;
-                calls.add(new RecentCall(number.trim(), name == null || name.trim().isEmpty() ? "Unknown caller" : name.trim(),
-                        timestamp > 0 ? formatter.format(new Date(timestamp)) : ""));
-            }
-        } catch (SecurityException ex) {
-            Toast.makeText(this, "Android or Vivo blocked call history access. Use Share or Paste instead.", Toast.LENGTH_LONG).show();
-        } catch (RuntimeException ex) {
-            Toast.makeText(this, "Could not read recent calls on this phone.", Toast.LENGTH_LONG).show();
-        }
-        return calls;
-    }
-
-    private void showRecentCalls(List<RecentCall> calls) {
-        Dialog dialog = new Dialog(this);
-        LinearLayout sheet = column();
-        sheet.setPadding(dp(22), dp(18), dp(22), dp(18));
-        sheet.setBackground(round(PANEL_COLOR, 24));
-        TextView title = text("Choose a number", 21, INK, true);
-        sheet.addView(title);
-        TextView subtitle = text("Select a call or saved number to fill the phone field.", 12, MUTED, false);
-        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
-        subtitleParams.topMargin = dp(5);
-        subtitleParams.bottomMargin = dp(12);
-        sheet.addView(subtitle, subtitleParams);
-
-        if (calls.isEmpty()) {
-            TextView empty = text("No recent numbers are available.", 14, MUTED, false);
-            empty.setGravity(Gravity.CENTER);
-            empty.setPadding(0, dp(24), 0, dp(24));
-            sheet.addView(empty);
-        } else {
-            ScrollView listScroll = new ScrollView(this);
-            listScroll.setFillViewport(false);
-            LinearLayout list = column();
-            for (RecentCall call : calls) {
-                LinearLayout item = column();
-                item.setPadding(dp(13), dp(11), dp(13), dp(11));
-                item.setBackground(fieldBackground());
-                item.addView(text(call.name, 14, INK, true));
-                TextView detail = text(call.number + (call.time.isEmpty() ? "" : "   ·   " + call.time), 12, MUTED, false);
-                LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-1, -2);
-                detailParams.topMargin = dp(3);
-                item.addView(detail, detailParams);
-                LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(-1, -2);
-                itemParams.bottomMargin = dp(7);
-                list.addView(item, itemParams);
-                item.setOnClickListener(v -> {
-                    switchTab("home");
-                    phone.setText(call.number);
-                    if (call.number.startsWith("+")) {
-                        try { selectCountryRegion(phoneUtil.getRegionCodeForNumber(phoneUtil.parse(call.number, null))); }
-                        catch (NumberParseException ignored) { country.setSelection(prefixes.length - 1); }
-                    }
-                    phone.setSelection(phone.length());
-                    error.setText("");
-                    dialog.dismiss();
-                });
-            }
-            listScroll.addView(list);
-            sheet.addView(listScroll, new LinearLayout.LayoutParams(-1, Math.min(dp(440), Math.max(dp(120), calls.size() * dp(66)))));
-        }
-        TextView close = text("Close", 14, GREEN, true);
-        close.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-1, dp(46));
-        closeParams.topMargin = dp(8);
-        sheet.addView(close, closeParams);
-        close.setOnClickListener(v -> dialog.dismiss());
-        dialog.setContentView(sheet);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawableResource(android.R.color.transparent);
-            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            WindowManager.LayoutParams params = window.getAttributes();
-            params.width = getResources().getDisplayMetrics().widthPixels - dp(28);
-            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
-            params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-            params.dimAmount = .38f;
-            window.setAttributes(params);
-        }
-        dialog.show();
-        if (window != null) window.setLayout(getResources().getDisplayMetrics().widthPixels - dp(28), WindowManager.LayoutParams.WRAP_CONTENT);
-    }
-
-    private static final class RecentCall {
-        final String number;
-        final String name;
-        final String time;
-        RecentCall(String number, String name, String time) {
-            this.number = number;
-            this.name = name;
-            this.time = time;
         }
     }
 

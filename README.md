@@ -1,12 +1,12 @@
-# Direct for Android
+# Direct Chat for Android
 
-A native Android app that opens a WhatsApp click-to-chat link. Enter the phone number (country code preselected as Pakistan), optionally add a message, and tap **Choose WhatsApp account**. Android shows an app picker on every send so you can choose WhatsApp, WhatsApp Business, or a Vivo clone if it appears. Sending remains a manual action in WhatsApp.
+A native Android utility that opens a WhatsApp or WhatsApp Business chat without requiring you to save the phone number as a contact. Enter an international number, choose a country code, paste a number, or share a phone number/text into Direct Chat from another app. Choose the WhatsApp account and review/send the message inside that app. Direct Chat does not send messages on your behalf.
 
 ## Open in Android Studio
 
 Open this folder as a project. It uses Android Gradle Plugin 9.1.1, Gradle 9.3.1, JDK 17, and Android SDK 36. Android Studio will download the Gradle and Android build components if needed. The app uses Google's libphonenumber library and Google Mobile Ads SDK for banner advertisements.
 
-GitHub Actions builds a debug APK whenever you push to `main` or `master`. Download it from the workflow run under the artifact name `direct-whatsapp-debug-apk` (ZIP). To build locally in Android Studio, choose **Build > Build APK(s)**; the APK appears under `app/build/outputs/apk/debug/`.
+GitHub Actions builds a debug APK for pull requests and pushes to the configured branches. Download it from the workflow run under the artifact name `direct-whatsapp-debug-apk` (ZIP). To build locally in Android Studio, choose **Build > Build APK(s)**; the APK appears under `app/build/outputs/apk/debug/`.
 
 ## Privacy and legal pages
 
@@ -14,7 +14,7 @@ GitHub Actions builds a debug APK whenever you push to `main` or `master`. Downl
 - Terms of Use source: `docs/terms.html`
 - Developer contact: Abdul Sami — shining.8090@gmail.com
 
-The app can save up to 30 recent numbers locally only when the optional Save recent numbers switch is enabled. It reads call-log entries only when the user opens Recent calls and grants permission; the app does not upload the call log. The Google Mobile Ads SDK requires internet access and may collect or share device/ad identifiers, IP address, interaction, and diagnostic data according to Google's disclosures. The app does not create user accounts or send WhatsApp messages automatically.
+Optional local history is off by default. When enabled, the app stores up to 30 numbers in private app storage on this device; turning the setting off clears them. Direct Chat does not request or read call-log data. Users can type numbers, paste them after tapping Paste, or share numbers into the app. The Google Mobile Ads SDK requires internet access and may collect or share device/ad identifiers, IP address, interaction, and diagnostic data according to Google's disclosures. The app does not create user accounts or send WhatsApp messages automatically.
 
 ### Publish the policy URLs
 
