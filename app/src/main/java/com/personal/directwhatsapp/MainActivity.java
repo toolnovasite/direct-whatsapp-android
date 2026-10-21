@@ -85,6 +85,14 @@ public final class MainActivity extends Activity {
     private Switch saveHistorySwitch;
     private FrameLayout bannerAdContainer;
     private AdView bannerAdView;
+    private FrameLayout pageFrame;
+    private ScrollView homeScroll;
+    private LinearLayout navigationBar;
+    private String activeTab = "home";
+    private final List<LinearLayout> navigationItems = new ArrayList<>();
+    private final List<TextView> navigationIcons = new ArrayList<>();
+    private final List<TextView> navigationLabels = new ArrayList<>();
+    private final List<String> navigationKeys = new ArrayList<>();
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -112,7 +120,7 @@ public final class MainActivity extends Activity {
         scroll.setClipToPadding(false);
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(22), dp(15), dp(22), dp(30));
+        page.setPadding(dp(20), dp(12), dp(20), dp(18));
         page.setBackgroundColor(PAGE);
         scroll.addView(page);
 
@@ -137,26 +145,20 @@ public final class MainActivity extends Activity {
         tagline.setLetterSpacing(.08f);
         LinearLayout.LayoutParams tg = new LinearLayout.LayoutParams(-2, -2); tg.topMargin = dp(2); brand.addView(tagline, tg);
         header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView settingsButton = text("⚙", 22, INK, true);
-        settingsButton.setGravity(Gravity.CENTER);
-        settingsButton.setContentDescription("Settings");
-        settingsButton.setBackground(pill(FIELD_COLOR, 16));
-        header.addView(settingsButton, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        settingsButton.setOnClickListener(v -> showSettingsDialog());
         page.addView(header);
 
         TextView eyebrow = text("QUICK WHATSAPP CHAT", 11, GREEN, true);
         eyebrow.setLetterSpacing(.13f);
-        LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2); ep.topMargin = dp(30); page.addView(eyebrow, ep);
-        TextView title = text("Message without\nsaving a number.", 33, INK, true);
+        LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2); ep.topMargin = dp(22); page.addView(eyebrow, ep);
+        TextView title = text("Message without\\nsaving a number.", 30, INK, true);
         title.setLetterSpacing(-.035f);
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2); hp.topMargin = dp(12); page.addView(title, hp);
         TextView intro = text("Enter a number, choose an account, then write your message in WhatsApp.", 14, MUTED, false);
         intro.setLineSpacing(dp(4), 1f);
-        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, -2); ip.topMargin = dp(11); ip.bottomMargin = dp(22); page.addView(intro, ip);
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, -2); ip.topMargin = dp(9); ip.bottomMargin = dp(18); page.addView(intro, ip);
 
         LinearLayout card = column();
-        card.setPadding(dp(19), dp(20), dp(19), dp(19));
+        card.setPadding(dp(17), dp(17), dp(17), dp(16));
         card.setBackground(panel());
         card.setElevation(dp(3));
         page.addView(card, new LinearLayout.LayoutParams(-1, -2));
@@ -239,65 +241,358 @@ public final class MainActivity extends Activity {
         adContainerParams.gravity = Gravity.CENTER_HORIZONTAL;
         card.addView(bannerAdContainer, adContainerParams);
 
+        homeScroll = scroll;
+        pageFrame = new FrameLayout(this);
+        pageFrame.addView(homeScroll, new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout appRoot = column();
+        appRoot.setBackgroundColor(PAGE);
+        appRoot.addView(pageFrame, new LinearLayout.LayoutParams(-1, 0, 1f));
+        navigationBar = buildNavigationBar();
+        appRoot.addView(navigationBar, new LinearLayout.LayoutParams(-1, dp(64)));
+        setContentView(appRoot);
+        updateNavigationAppearance();
+    }
+
+
+    private LinearLayout buildNavigationBar() {
+        navigationItems.clear();
+        navigationIcons.clear();
+        navigationLabels.clear();
+        navigationKeys.clear();
+        LinearLayout bar = row();
+        bar.setPadding(dp(7), dp(5), dp(7), dp(5));
+        bar.setBackgroundColor(PANEL_COLOR);
+        bar.setElevation(dp(5));
+        String[][] destinations = {
+                {"home", "⌂", "Home"},
+                {"recent", "◷", "Recent"},
+                {"guide", "ⓘ", "Guide"},
+                {"settings", "⚙", "Settings"}
+        };
+        for (String[] destination : destinations) {
+            final String tab = destination[0];
+            LinearLayout item = column();
+            item.setGravity(Gravity.CENTER);
+            item.setPadding(dp(2), dp(3), dp(2), dp(3));
+            TextView icon = text(destination[1], 19, MUTED, false);
+            icon.setGravity(Gravity.CENTER);
+            TextView label = text(destination[2], 10, MUTED, false);
+            label.setGravity(Gravity.CENTER);
+            item.addView(icon, new LinearLayout.LayoutParams(-1, -2));
+            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
+            labelParams.topMargin = dp(1);
+            item.addView(label, labelParams);
+            item.setContentDescription(destination[2] + " tab");
+            item.setOnClickListener(v -> switchTab(tab));
+            bar.addView(item, new LinearLayout.LayoutParams(0, -1, 1f));
+            navigationItems.add(item);
+            navigationIcons.add(icon);
+            navigationLabels.add(label);
+            navigationKeys.add(tab);
+        }
+        return bar;
+    }
+
+    private void updateNavigationAppearance() {
+        for (int i = 0; i < navigationItems.size(); i++) {
+            boolean selected = activeTab.equals(navigationKeys.get(i));
+            navigationItems.get(i).setBackground(round(selected ? SOFT_GREEN : PANEL_COLOR, 14));
+            navigationIcons.get(i).setTextColor(selected ? GREEN : MUTED);
+            navigationLabels.get(i).setTextColor(selected ? GREEN : MUTED);
+            navigationLabels.get(i).setTypeface(Typeface.DEFAULT, selected ? Typeface.BOLD : Typeface.NORMAL);
+        }
+    }
+
+    private void switchTab(String tab) {
+        if (pageFrame == null || homeScroll == null) return;
+        activeTab = tab;
+        for (int i = pageFrame.getChildCount() - 1; i >= 1; i--) {
+            pageFrame.removeViewAt(i);
+        }
+        if ("home".equals(tab)) {
+            homeScroll.setVisibility(View.VISIBLE);
+        } else {
+            homeScroll.setVisibility(View.GONE);
+            pageFrame.addView(buildDestinationPage(tab), new FrameLayout.LayoutParams(-1, -1));
+        }
+        updateNavigationAppearance();
+    }
+
+    private View buildDestinationPage(String tab) {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        LinearLayout content = column();
+        content.setPadding(dp(20), dp(20), dp(20), dp(26));
+        content.setBackgroundColor(PAGE);
+        scroll.addView(content);
+        if ("recent".equals(tab)) buildRecentPage(content);
+        else if ("guide".equals(tab)) buildGuidePage(content);
+        else buildSettingsPage(content);
+        return scroll;
+    }
+
+    private void addPageHeader(LinearLayout content, String eyebrow, String title, String subtitle) {
+        TextView kicker = text(eyebrow, 10, GREEN, true);
+        kicker.setLetterSpacing(.10f);
+        content.addView(kicker);
+        TextView heading = text(title, 27, INK, true);
+        LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(-1, -2);
+        headingParams.topMargin = dp(7);
+        content.addView(heading, headingParams);
+        TextView detail = text(subtitle, 13, MUTED, false);
+        detail.setLineSpacing(dp(3), 1f);
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-1, -2);
+        detailParams.topMargin = dp(6);
+        detailParams.bottomMargin = dp(14);
+        content.addView(detail, detailParams);
+    }
+
+    private LinearLayout sectionCard(LinearLayout parent, String title, String subtitle) {
+        LinearLayout card = column();
+        card.setPadding(dp(16), dp(15), dp(16), dp(15));
+        card.setBackground(panel());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(10);
+        parent.addView(card, params);
+        card.addView(text(title, 16, INK, true));
+        if (subtitle != null && !subtitle.isEmpty()) {
+            TextView detail = text(subtitle, 12, MUTED, false);
+            detail.setLineSpacing(dp(2), 1f);
+            LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-1, -2);
+            detailParams.topMargin = dp(5);
+            card.addView(detail, detailParams);
+        }
+        return card;
+    }
+
+    private TextView primaryAction(String caption) {
+        TextView action = text(caption, 14, Color.WHITE, true);
+        action.setGravity(Gravity.CENTER);
+        action.setPadding(dp(12), dp(12), dp(12), dp(12));
+        action.setBackground(round(DARK_GREEN, 14));
+        action.setMinHeight(dp(48));
+        return action;
+    }
+
+    private void buildRecentPage(LinearLayout content) {
+        addPageHeader(content, "YOUR ACTIVITY", "Recent numbers",
+                "Use a saved number again, or choose one from your phone's call log.");
+        TextView callLog = primaryAction("Choose from Recent Calls");
+        LinearLayout.LayoutParams callLogParams = new LinearLayout.LayoutParams(-1, -2);
+        callLogParams.bottomMargin = dp(7);
+        content.addView(callLog, callLogParams);
+        callLog.setOnClickListener(v -> openRecentCalls());
+
+        boolean historyEnabled = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_SAVE_HISTORY, false);
+        List<String> numbers = getSavedNumberList();
+        LinearLayout card = sectionCard(content, "Saved numbers",
+                historyEnabled ? "Saved privately on this device · " + numbers.size() + " of 30"
+                        : "Local history is off. Turn it on in Settings to save numbers you open.");
+        if (!historyEnabled) {
+            TextView enable = primaryAction("Manage local history in Settings");
+            LinearLayout.LayoutParams enableParams = new LinearLayout.LayoutParams(-1, -2);
+            enableParams.topMargin = dp(12);
+            card.addView(enable, enableParams);
+            enable.setOnClickListener(v -> switchTab("settings"));
+        } else if (numbers.isEmpty()) {
+            TextView empty = text("No saved numbers yet. When local history is enabled, numbers you open will appear here.", 13, MUTED, false);
+            empty.setLineSpacing(dp(3), 1f);
+            LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(-1, -2);
+            emptyParams.topMargin = dp(12);
+            card.addView(empty, emptyParams);
+        } else {
+            TextView clear = text("Clear all", 12, GREEN, true);
+            clear.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(-1, dp(36));
+            clearParams.topMargin = dp(4);
+            card.addView(clear, clearParams);
+            clear.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setTitle("Clear saved numbers?")
+                    .setMessage("This removes the saved numbers stored by Direct Chat on this phone.")
+                    .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                    .setPositiveButton("Clear", (dialog, which) -> {
+                        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().remove(PREF_RECENT_NUMBERS).apply();
+                        switchTab("recent");
+                    }).show());
+
+            for (String number : numbers) {
+                LinearLayout item = row();
+                item.setPadding(dp(12), dp(11), dp(9), dp(11));
+                item.setBackground(fieldBackground());
+                LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(-1, -2);
+                itemParams.topMargin = dp(7);
+                card.addView(item, itemParams);
+                LinearLayout copy = column();
+                copy.addView(text(formatDisplayNumber(number), 13, INK, true));
+                TextView hint = text("Tap to use this number", 11, MUTED, false);
+                LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(-1, -2);
+                hintParams.topMargin = dp(3);
+                copy.addView(hint, hintParams);
+                item.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+                TextView remove = text("×", 21, MUTED, false);
+                remove.setGravity(Gravity.CENTER);
+                remove.setPadding(dp(10), 0, dp(7), 0);
+                remove.setContentDescription("Remove saved number");
+                item.addView(remove, new LinearLayout.LayoutParams(-2, dp(42)));
+                item.setOnClickListener(v -> useSavedNumber(number));
+                remove.setOnClickListener(v -> {
+                    List<String> remaining = getSavedNumberList();
+                    remaining.remove(number);
+                    persistSavedNumberList(remaining);
+                    switchTab("recent");
+                });
+            }
+        }
+    }
+
+    private String formatDisplayNumber(String number) {
+        try {
+            return phoneUtil.format(phoneUtil.parse(number, null), PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL);
+        } catch (NumberParseException ignored) {
+            return number;
+        }
+    }
+
+    private void useSavedNumber(String number) {
+        switchTab("home");
+        if (phone == null) return;
+        phone.setText(number);
+        phone.setSelection(phone.length());
+        error.setText("");
+    }
+
+    private void persistSavedNumberList(List<String> numbers) {
+        StringBuilder stored = new StringBuilder();
+        for (String number : numbers) {
+            if (number == null || number.trim().isEmpty()) continue;
+            if (stored.length() > 0) stored.append('\n');
+            stored.append(number.trim());
+        }
+        android.content.SharedPreferences.Editor editor = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit();
+        if (stored.length() == 0) editor.remove(PREF_RECENT_NUMBERS);
+        else editor.putString(PREF_RECENT_NUMBERS, stored.toString());
+        editor.apply();
+    }
+
+    private void buildGuidePage(LinearLayout content) {
+        addPageHeader(content, "QUICK START", "How Direct Chat works",
+                "Start a conversation without first creating a contact. Direct Chat opens WhatsApp; you stay in control of the message.");
+        addGuideStep(content, "01", "Enter the phone number",
+                "Choose the country code or paste a number. For reliable international formatting, enter the full number starting with + and the country code.");
+        addGuideStep(content, "02", "Choose your WhatsApp account",
+                "Tap Continue, then choose WhatsApp or WhatsApp Business. The selected app must be installed on your phone.");
+        addGuideStep(content, "03", "Review the chat in WhatsApp",
+                "Check the number and type your message in WhatsApp. Direct Chat does not send messages for you.");
+
+        sectionCard(content, "Country selection",
+                "We prefer your SIM country, then your mobile network country, then your device region. If those sources are unavailable, the app falls back to Pakistan. A number that starts with + can be used to detect its country code. You can still choose a country manually.");
+        sectionCard(content, "Your privacy",
+                "Saving recent numbers is optional and off by default. If enabled, numbers are stored locally on this phone; turning the setting off clears that list. Call history is accessed only after you tap Recent Calls and approve Android's permission prompt.");
+
+        LinearLayout helpCard = sectionCard(content, "Troubleshooting", "");
+        addHelpRow(helpCard, "Country looks wrong", "Open the country field on Home and select the correct country code.");
+        addHelpRow(helpCard, "A number is rejected", "Check that the number is complete and includes the correct international prefix when needed.");
+        addHelpRow(helpCard, "WhatsApp does not open", "Check that WhatsApp or WhatsApp Business is installed and available in your phone profile.");
+    }
+
+    private void addGuideStep(LinearLayout content, String number, String title, String description) {
+        LinearLayout card = sectionCard(content, title, description);
+        LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) card.getLayoutParams();
+        params.topMargin = dp(7);
+        card.setLayoutParams(params);
+        TextView badge = text(number, 11, GREEN, true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setBackground(pill(SOFT_GREEN, 20));
+        badge.setPadding(dp(10), dp(6), dp(10), dp(6));
+        card.addView(badge, 0);
+        LinearLayout.LayoutParams badgeParams = (LinearLayout.LayoutParams) badge.getLayoutParams();
+        badgeParams.bottomMargin = dp(9);
+        badge.setLayoutParams(badgeParams);
+    }
+
+    private void addHelpRow(LinearLayout parent, String title, String detail) {
+        TextView heading = text(title, 13, INK, true);
+        LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(-1, -2);
+        headingParams.topMargin = dp(10);
+        parent.addView(heading, headingParams);
+        TextView copy = text(detail, 12, MUTED, false);
+        copy.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(-1, -2);
+        copyParams.topMargin = dp(3);
+        parent.addView(copy, copyParams);
+    }
+
+    private void buildSettingsPage(LinearLayout content) {
+        addPageHeader(content, "PREFERENCES", "Settings",
+                "Control local history, appearance, shortcuts, and legal information.");
+
+        LinearLayout appearance = sectionCard(content, "Appearance", "Choose the look that feels comfortable on your phone.");
+        LinearLayout themeRow = row();
+        LinearLayout themeCopy = column();
+        themeCopy.addView(text("Dark mode", 14, INK, true));
+        TextView themeHint = text("Use a darker background throughout the app.", 12, MUTED, false);
+        LinearLayout.LayoutParams themeHintParams = new LinearLayout.LayoutParams(-1, -2);
+        themeHintParams.topMargin = dp(3);
+        themeCopy.addView(themeHint, themeHintParams);
+        themeRow.addView(themeCopy, new LinearLayout.LayoutParams(0, -2, 1f));
+        Switch darkSwitch = new Switch(this);
+        darkSwitch.setChecked(getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_DARK_MODE, false));
+        themeRow.addView(darkSwitch);
+        LinearLayout.LayoutParams themeRowParams = new LinearLayout.LayoutParams(-1, -2);
+        themeRowParams.topMargin = dp(12);
+        appearance.addView(themeRow, themeRowParams);
+        darkSwitch.setOnCheckedChangeListener((button, enabled) -> {
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean(PREF_DARK_MODE, enabled).apply();
+            recreate();
+        });
+
+        LinearLayout history = sectionCard(content, "Local history",
+                "Off by default. When enabled, Direct Chat keeps up to 30 numbers you open on this device only.");
         LinearLayout historyRow = row();
-        LinearLayout.LayoutParams historyParams = new LinearLayout.LayoutParams(-1, -2);
-        historyParams.topMargin = dp(13);
-        card.addView(historyRow, historyParams);
         LinearLayout historyCopy = column();
-        historyCopy.addView(text("Save recent numbers", 12, INK, true));
-        TextView historyCaption = text("Only on this phone · off by default", 10, MUTED, false);
-        LinearLayout.LayoutParams historyCaptionParams = new LinearLayout.LayoutParams(-1, -2);
-        historyCaptionParams.topMargin = dp(2);
-        historyCopy.addView(historyCaption, historyCaptionParams);
-        historyRow.addView(historyCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        historyCopy.addView(text("Save recent numbers", 14, INK, true));
+        TextView historyHint = text("Turning this off also clears saved numbers.", 12, MUTED, false);
+        LinearLayout.LayoutParams historyHintParams = new LinearLayout.LayoutParams(-1, -2);
+        historyHintParams.topMargin = dp(3);
+        historyCopy.addView(historyHint, historyHintParams);
+        historyRow.addView(historyCopy, new LinearLayout.LayoutParams(0, -2, 1f));
         saveHistorySwitch = new Switch(this);
         saveHistorySwitch.setChecked(getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_SAVE_HISTORY, false));
         historyRow.addView(saveHistorySwitch);
+        LinearLayout.LayoutParams historyRowParams = new LinearLayout.LayoutParams(-1, -2);
+        historyRowParams.topMargin = dp(12);
+        history.addView(historyRow, historyRowParams);
         saveHistorySwitch.setOnCheckedChangeListener((button, enabled) -> {
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean(PREF_SAVE_HISTORY, enabled).apply();
-            if (!enabled) getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().remove(PREF_RECENT_NUMBERS).apply();
-            historyCaption.setText(enabled ? "Stored only here · turn off to clear" : "Only on this phone · off by default");
+            android.content.SharedPreferences.Editor editor = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit();
+            editor.putBoolean(PREF_SAVE_HISTORY, enabled);
+            if (!enabled) editor.remove(PREF_RECENT_NUMBERS);
+            editor.apply();
+            historyHint.setText(enabled ? "Numbers you open will be stored only on this phone."
+                    : "History is off; any previously saved numbers have been cleared.");
         });
-        historyCaption.setText(saveHistorySwitch.isChecked() ? "Stored only here · turn off to clear" : "Only on this phone · off by default");
-        TextView savedNumbers = text("VIEW SAVED NUMBERS  ›", 10, GREEN, true);
-        savedNumbers.setGravity(Gravity.CENTER);
-        savedNumbers.setPadding(dp(10), 0, dp(4), 0);
-        historyRow.addView(savedNumbers, new LinearLayout.LayoutParams(-2, dp(40)));
-        savedNumbers.setOnClickListener(v -> showSavedNumbers());
 
-        TextView addShortcut = text("＋  Add Recent Calls shortcut to Home screen", 12, GREEN, true);
-        addShortcut.setGravity(Gravity.CENTER);
-        addShortcut.setPadding(dp(8), dp(12), dp(8), dp(5));
-        LinearLayout.LayoutParams shortcutParams = new LinearLayout.LayoutParams(-1, -2);
-        shortcutParams.topMargin = dp(5);
-        card.addView(addShortcut, shortcutParams);
-        addShortcut.setOnClickListener(v -> pinRecentCallsShortcut());
+        LinearLayout convenience = sectionCard(content, "Quick access", "Optional shortcuts for features you use often.");
+        TextView shortcut = text("＋  Add Recent Calls shortcut", 14, GREEN, true);
+        shortcut.setPadding(0, dp(12), 0, dp(7));
+        convenience.addView(shortcut);
+        shortcut.setOnClickListener(v -> pinRecentCallsShortcut());
 
-        LinearLayout stepsTitle = row();
-        LinearLayout.LayoutParams stp = new LinearLayout.LayoutParams(-1, -2); stp.topMargin = dp(25); stp.bottomMargin = dp(11); page.addView(stepsTitle, stp);
-        stepsTitle.addView(text("Simple by design", 14, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
-        stepsTitle.addView(text("3 STEPS", 9, MUTED, true));
-        LinearLayout steps = row();
-        page.addView(steps);
-        steps.addView(step("01", "Enter\nnumber"), new LinearLayout.LayoutParams(0, dp(70), 1));
-        LinearLayout.LayoutParams middle = new LinearLayout.LayoutParams(0, dp(70), 1); middle.leftMargin = dp(8); middle.rightMargin = dp(8);
-        steps.addView(step("02", "Choose\naccount"), middle);
-        steps.addView(step("03", "Review &\nsend"), new LinearLayout.LayoutParams(0, dp(70), 1));
+        LinearLayout legal = sectionCard(content, "Privacy and terms",
+                "Read how the app handles data and what to expect when using it.");
+        addSettingsLink(legal, "Privacy Policy", () -> openLegalPage("https://toolnovasite.github.io/direct-whatsapp-android/privacy-policy.html"));
+        addSettingsLink(legal, "Terms of Use", () -> openLegalPage("https://toolnovasite.github.io/direct-whatsapp-android/terms.html"));
 
-        LinearLayout privacy = row();
-        privacy.setGravity(Gravity.CENTER_VERTICAL);
-        privacy.setPadding(dp(13), dp(12), dp(13), dp(12));
-        privacy.setBackground(pill(PRIVACY_COLOR, 14));
-        LinearLayout.LayoutParams prv = new LinearLayout.LayoutParams(-1, -2); prv.topMargin = dp(16); page.addView(privacy, prv);
-        TextView lock = text("✓", 14, GREEN, true); lock.setGravity(Gravity.CENTER);
-        lock.setBackground(pill(Color.WHITE, 20));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(26), dp(26)); lp.rightMargin = dp(10); privacy.addView(lock, lp);
-        TextView privacyText = text("Numbers are only saved if you turn on local history. Call log is read only when requested.", 11, MUTED, false);
-        privacyText.setLineSpacing(dp(2), 1f);
-        privacy.addView(privacyText, new LinearLayout.LayoutParams(0, -2, 1));
+        sectionCard(content, "About Direct Chat",
+                "Direct Chat opens a chat link in WhatsApp or WhatsApp Business. You review and send messages inside that app; Direct Chat does not send them on your behalf.");
+    }
 
-
-        setContentView(scroll);
+    private void addSettingsLink(LinearLayout parent, String caption, Runnable action) {
+        TextView link = text(caption + "   ›", 14, GREEN, true);
+        link.setPadding(0, dp(13), 0, dp(9));
+        parent.addView(link);
+        link.setOnClickListener(v -> action.run());
     }
 
     private void openLegalPage(String url) {
@@ -310,16 +605,22 @@ public final class MainActivity extends Activity {
 
     private void loadBannerAd() {
         if (bannerAdContainer == null || isFinishing()) return;
-        bannerAdView = new AdView(this);
-        bannerAdView.setAdUnitId(AdMobConfig.BANNER_AD_UNIT_ID);
-        int availableWidthDp = (int) (getResources().getDisplayMetrics().widthPixels
-                / getResources().getDisplayMetrics().density) - 44;
-        bannerAdView.setAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
-                this, Math.max(1, availableWidthDp)));
-        bannerAdContainer.removeAllViews();
-        bannerAdContainer.addView(bannerAdView,
-                new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));
-        bannerAdView.loadAd(new AdRequest.Builder().build());
+        bannerAdContainer.post(() -> {
+            if (bannerAdContainer == null || isFinishing() || bannerAdContainer.getWidth() <= 0) return;
+            if (bannerAdView != null) {
+                bannerAdView.destroy();
+                bannerAdView = null;
+            }
+            float density = getResources().getDisplayMetrics().density;
+            int availableWidthDp = (int) (bannerAdContainer.getWidth() / density);
+            bannerAdView = new AdView(this);
+            bannerAdView.setAdUnitId(AdMobConfig.BANNER_AD_UNIT_ID);
+            bannerAdView.setAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
+                    this, Math.max(1, availableWidthDp)));
+            bannerAdContainer.removeAllViews();
+            bannerAdContainer.addView(bannerAdView, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));
+            bannerAdView.loadAd(new AdRequest.Builder().build());
+        });
     }
 
     @Override protected void onDestroy() {
@@ -635,6 +936,7 @@ public final class MainActivity extends Activity {
                 itemParams.bottomMargin = dp(7);
                 list.addView(item, itemParams);
                 item.setOnClickListener(v -> {
+                    switchTab("home");
                     phone.setText(call.number);
                     if (call.number.startsWith("+")) {
                         try { selectCountryRegion(phoneUtil.getRegionCodeForNumber(phoneUtil.parse(call.number, null))); }
