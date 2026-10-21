@@ -505,7 +505,7 @@ public final class MainActivity extends Activity {
 
     private void buildSettingsPage(LinearLayout content) {
         addPageHeader(content, "PREFERENCES", "Settings",
-                "Control local history, appearance, shortcuts, and legal information.");
+                "Control local history, appearance, and legal information.");
 
         LinearLayout appearance = sectionCard(content, "Appearance", "Choose the look that feels comfortable on your phone.");
         LinearLayout themeRow = row();
@@ -910,7 +910,7 @@ public final class MainActivity extends Activity {
     }
     private LinearLayout row() { LinearLayout l = new LinearLayout(this); l.setOrientation(LinearLayout.HORIZONTAL); l.setGravity(Gravity.CENTER_VERTICAL); return l; }
     private LinearLayout column() { LinearLayout l = new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
-    private TextView text(String value, int size, int color, boolean bold) { TextView t = new TextView(this); t.setText(value); t.setTextSize(size); t.setTextColor(color); if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD); return t; }
+    private TextView text(String value, int size, int color, boolean bold) { TextView t = new TextView(this); t.setText(value); t.setTextSize(Math.max(11, size)); t.setTextColor(color); if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD); return t; }
     private GradientDrawable round(int color, int radius) { GradientDrawable d = new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(radius)); return d; }
     private GradientDrawable pill(int color, int radius) { return round(color, radius); }
     private GradientDrawable fieldBackground() { GradientDrawable d = round(FIELD_COLOR, 13); d.setStroke(dp(1), LINE); return d; }
@@ -951,66 +951,6 @@ public final class MainActivity extends Activity {
                 View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
     }
 
-    private void showSettingsDialog() {
-        Dialog dialog = new Dialog(this);
-        LinearLayout content = column();
-        content.setPadding(dp(22), dp(20), dp(22), dp(18));
-        content.setBackground(round(PANEL_COLOR, 24));
-        content.addView(text("Settings", 22, INK, true));
-        TextView subtitle = text("Appearance and legal information", 13, MUTED, false);
-        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
-        subParams.topMargin = dp(4);
-        subParams.bottomMargin = dp(14);
-        content.addView(subtitle, subParams);
-
-        LinearLayout themeRow = row();
-        themeRow.setPadding(0, dp(8), 0, dp(8));
-        LinearLayout themeCopy = column();
-        themeCopy.addView(text("Dark mode", 15, INK, true));
-        TextView themeDescription = text("Switch between day and night appearance", 11, MUTED, false);
-        LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(-1, -2);
-        descParams.topMargin = dp(3);
-        themeCopy.addView(themeDescription, descParams);
-        themeRow.addView(themeCopy, new LinearLayout.LayoutParams(0, -2, 1));
-        Switch darkSwitch = new Switch(this);
-        darkSwitch.setChecked(getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(PREF_DARK_MODE, false));
-        themeRow.addView(darkSwitch);
-        content.addView(themeRow);
-        darkSwitch.setOnCheckedChangeListener((button, enabled) -> {
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean(PREF_DARK_MODE, enabled).apply();
-            dialog.dismiss();
-            recreate();
-        });
-
-        TextView privacy = text("Privacy Policy   ›", 15, GREEN, true);
-        privacy.setPadding(0, dp(14), 0, dp(14));
-        content.addView(privacy);
-        privacy.setOnClickListener(v -> { dialog.dismiss(); openLegalPage("https://toolnovasite.github.io/direct-whatsapp-android/privacy-policy.html"); });
-        TextView terms = text("Terms of Use   ›", 15, GREEN, true);
-        terms.setPadding(0, dp(14), 0, dp(14));
-        content.addView(terms);
-        terms.setOnClickListener(v -> { dialog.dismiss(); openLegalPage("https://toolnovasite.github.io/direct-whatsapp-android/terms.html"); });
-        TextView close = text("Close", 14, MUTED, true);
-        close.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-1, dp(44));
-        closeParams.topMargin = dp(6);
-        content.addView(close, closeParams);
-        close.setOnClickListener(v -> dialog.dismiss());
-        dialog.setContentView(content);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawableResource(android.R.color.transparent);
-            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            WindowManager.LayoutParams params = window.getAttributes();
-            params.width = getResources().getDisplayMetrics().widthPixels - dp(36);
-            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
-            params.gravity = Gravity.CENTER;
-            params.dimAmount = .35f;
-            window.setAttributes(params);
-        }
-        dialog.show();
-        if (window != null) window.setLayout(getResources().getDisplayMetrics().widthPixels - dp(36), WindowManager.LayoutParams.WRAP_CONTENT);
-    }
     private int dp(int value) { return (int)(value * getResources().getDisplayMetrics().density + .5f); }
 }
 
