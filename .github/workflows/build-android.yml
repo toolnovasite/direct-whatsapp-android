@@ -31,6 +31,7 @@ jobs:
           packages: platform-tools
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+# Stable debug signing key is supplied via the DEBUG_KEYSTORE_BASE64 Actions secret.
       - name: Configure stable debug signing key when available
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
