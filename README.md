@@ -8,6 +8,22 @@ Open this folder as a project. It uses Android Gradle Plugin 9.1.1, Gradle 9.3.1
 
 GitHub Actions builds a debug APK for pull requests and pushes to the configured branches. Download it from the workflow run under the artifact name `direct-whatsapp-debug-apk` (ZIP). To build locally in Android Studio, choose **Build > Build APK(s)**; the APK appears under `app/build/outputs/apk/debug/`.
 
+### Keep test APK installs updateable
+
+Android requires an update to use the same application ID and compatible signing certificate as the installed app. GitHub-hosted runners are fresh build environments, so their automatically generated debug signing key can change between runs unless one is supplied. The workflow supports a persistent development-only key using the repository Actions secret `DEBUG_KEYSTORE_BASE64`.
+
+On your Windows development PC, copy the existing Android Studio debug keystore as Base64 to the clipboard in PowerShell:
+
+```powershell
+$keystore = Join-Path $env:USERPROFILE ".android\\debug.keystore"
+if (-not (Test-Path $keystore)) { throw "Debug keystore not found. Open/run the project in Android Studio first." }
+[Convert]::ToBase64String([IO.File]::ReadAllBytes($keystore)) | Set-Clipboard
+```
+
+Then open this repository on GitHub and go to **Settings → Secrets and variables → Actions → New repository secret**. Set the name to `DEBUG_KEYSTORE_BASE64` and paste the clipboard value as the secret. Do not put the keystore or its Base64 value in the repository or share it in chat. The workflow expects the standard Android Studio debug keystore alias and password (`androiddebugkey` / `android`). This debug key is for development APKs only, not Google Play release signing.
+
+If the APK currently installed on the phone came from an earlier CI run signed with a different temporary key, Android may require a one-time uninstall before the first stable-key build can install. Uninstalling erases Direct Chat's local settings and saved numbers; preserve anything important first. After that one-time change, builds using the configured key should be able to update one another when the package ID and version code remain compatible.
+
 ## Privacy and legal pages
 
 - Privacy Policy source: `docs/privacy-policy.html`

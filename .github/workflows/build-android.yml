@@ -31,6 +31,19 @@ jobs:
           packages: platform-tools
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Restore stable debug signing key
+        if: ${{ secrets.DEBUG_KEYSTORE_BASE64 != '' }}
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p "$HOME/.android"
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
+      - name: Warn when stable debug signing key is not configured
+        if: ${{ secrets.DEBUG_KEYSTORE_BASE64 == '' }}
+        run: |
+          echo "::warning title=Stable debug signing key missing::Configure the DEBUG_KEYSTORE_BASE64 repository Actions secret to keep CI debug APK signing stable across runs. Without it, an APK update may report App not installed if its signing certificate differs."
       - name: Run unit tests
         run: gradle --no-daemon testDebugUnitTest
       - name: Build debug APK
