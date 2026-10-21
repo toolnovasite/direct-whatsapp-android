@@ -166,7 +166,7 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams toolsParams = new LinearLayout.LayoutParams(-1, dp(44));
         toolsParams.topMargin = dp(9);
         card.addView(numberTools, toolsParams);
-        TextView recentCalls = text("◷   Saved numbers", 12, DARK_GREEN, true);
+        TextView recentCalls = text("◷   Saved numbers", 12, GREEN, true);
         recentCalls.setGravity(Gravity.CENTER);
         recentCalls.setContentDescription("Open saved numbers");
         recentCalls.setBackground(pill(SOFT_GREEN, 13));
@@ -180,8 +180,26 @@ public final class MainActivity extends Activity {
         numberTools.addView(paste, pasteParams);
         paste.setOnClickListener(v -> pasteNumber());
         country = new Spinner(this);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, countries);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, countries) {
+            private TextView styledCountryView(String value, boolean dropdown) {
+                TextView view = new TextView(MainActivity.this);
+                view.setText(value);
+                view.setTextColor(INK);
+                view.setTextSize(14);
+                view.setGravity(Gravity.CENTER_VERTICAL);
+                view.setPadding(dp(12), dp(dropdown ? 12 : 8), dp(12), dp(dropdown ? 12 : 8));
+                if (dropdown) view.setBackgroundColor(PANEL_COLOR);
+                return view;
+            }
+
+            @Override public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                return styledCountryView(getItem(position), false);
+            }
+
+            @Override public View getDropDownView(int position, View convertView, android.view.ViewGroup parent) {
+                return styledCountryView(getItem(position), true);
+            }
+        };
         country.setAdapter(adapter);
         country.setSelection(getDetectedCountryIndex());
         country.setPadding(dp(10), 0, dp(10), 0);
